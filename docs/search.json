@@ -4,9 +4,9 @@
     "href": "index.html",
     "title": "Quatro Example Book",
     "section": "",
-    "text": "Preface\nThis is a Quarto book.\nTo learn more about Quarto books visit https://quarto.org/docs/books.\n\n1 + 1\n\n[1] 2",
+    "text": "About This Book",
     "crumbs": [
-      "Preface"
+      "About This Book"
     ]
   },
   {
@@ -37,6 +37,16 @@
     "text": "Knuth, Donald E. 1984. “Literate Programming.” Comput.\nJ. (USA) 27 (2): 97–111. https://doi.org/10.1093/comjnl/27.2.97.",
     "crumbs": [
       "References"
+    ]
+  },
+  {
+    "objectID": "index.html#author-details",
+    "href": "index.html#author-details",
+    "title": "Quatro Example Book",
+    "section": "Author Details",
+    "text": "Author Details\nMy name is Paul",
+    "crumbs": [
+      "About This Book"
     ]
   }
 ]
