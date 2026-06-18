@@ -1,9 +1,5 @@
-# Preface {.unnumbered}
+# About This Book {.unnumbered}
 
-This is a Quarto book.
+## Author Details
 
-To learn more about Quarto books visit <https://quarto.org/docs/books>.
-
-```{r}
-1 + 1
-```
+My name is Paul
