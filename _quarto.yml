@@ -1,0 +1,26 @@
+project:
+  type: book
+  output-dir: docs
+
+book:
+  title: "Quatro Example Book"
+  author: "Paul Capewell"
+  date: ""
+  chapters:
+    - index.qmd
+    - intro.qmd
+    - summary.qmd
+    - references.qmd
+
+bibliography: references.bib
+
+format:
+  html:
+    theme:
+      - cosmo
+      - brand
+#  pdf:
+#    documentclass: scrreprt # only works if latex is installed
+
+
+
