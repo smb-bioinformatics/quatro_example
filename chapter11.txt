@@ -1,0 +1,179 @@
+# Functional Enrichment Analysis
+
+## What you'll learn
+
+In this tutorial, you'll use Gene Ontology enrichment analysis to identify biological pathways and processes associated with your differential expression results.
+
+::: {.callout-note}
+## Learning outcomes
+By the end of this chapter you should be able to:
+
+- map Ensembl identifiers to Entrez identifiers and quantify how much mapping loss occurs
+- define an appropriate tested-gene background ("universe") for enrichment analysis
+- run over-representation analysis (ORA) separately for a stated direction of change
+- interpret enriched terms as hypotheses to investigate, not validated mechanisms
+
+**ISCB alignment:** A3, C3, D3, E3, F3 and K3, at application/analysis level.
+:::
+
+::: {.callout-tip title="Recap: code so far" collapse="true"}
+```{r}
+#| message: false
+dir.create("results", showWarnings = FALSE)
+dir.create(file.path("results", "tables"), recursive = TRUE, showWarnings = FALSE)
+dir.create(file.path("results", "figures"), recursive = TRUE, showWarnings = FALSE)
+
+
+library(DESeq2)
+library(ggplot2)
+
+count_data <- as.matrix(read.csv("m_sample_counts.csv", header = TRUE, row.names = 1, check.names = FALSE))
+sample_info <- read.csv("m_sample_info.csv", header = TRUE, row.names = 1, check.names = FALSE)
+sample_info <- sample_info[colnames(count_data), , drop = FALSE]
+sample_info$status <- factor(sample_info$status)
+
+dds <- DESeqDataSetFromMatrix(countData = count_data, colData = sample_info, design = ~ status)
+dds <- dds[rowSums(counts(dds)) >= 10, ]
+
+gene_annotation <- data.frame(gene_id = rownames(dds), stringsAsFactors = FALSE)
+annotation_file <- read.csv("human_annotations_from_orgHs.csv", check.names = FALSE, stringsAsFactors = FALSE)
+gene_annotation$symbol <- annotation_file$SYMBOL_SAFE[match(gene_annotation$gene_id, annotation_file$ENSEMBL)]
+missing_symbol <- is.na(gene_annotation$symbol) | gene_annotation$symbol == ""
+gene_annotation$symbol[missing_symbol] <- gene_annotation$gene_id[missing_symbol]
+
+dds <- DESeq(dds)
+res_hat_vs_sero <- results(dds, contrast = c("status", "hat", "sero"), alpha = 0.05)
+
+result_data <- as.data.frame(res_hat_vs_sero)
+res_hat_vs_sero_table <- data.frame(
+  gene_id = rownames(result_data),
+  symbol = gene_annotation$symbol[match(rownames(result_data), gene_annotation$gene_id)],
+  result_data, row.names = NULL, check.names = FALSE, stringsAsFactors = FALSE
+)
+res_hat_vs_sero_table <- res_hat_vs_sero_table[order(res_hat_vs_sero_table$padj, na.last = TRUE), ]
+
+course_theme <- theme_classic(base_size = 12) +
+  theme(plot.title = element_text(face = "bold", size = 14), axis.title = element_text(face = "bold"),
+        axis.text = element_text(size = 11))
+```
+:::
+
+## Loading the annotation packages
+
+```{r}
+#| message: false
+library(AnnotationDbi)
+library(org.Hs.eg.db)
+library(clusterProfiler)
+library(enrichplot)
+```
+
+## Mapping Ensembl IDs to Entrez IDs
+
+Gene ontology annotation databases index genes by **Entrez** ID, not Ensembl ID, so we need to convert.
+
+```{r}
+tested_genes <- res_hat_vs_sero_table[!is.na(res_hat_vs_sero_table$padj), ]
+tested_genes$ensembl_lookup <- sub("\\..*$", "", tested_genes$gene_id)
+
+tested_genes$entrez_id <- unname(AnnotationDbi::mapIds(
+  org.Hs.eg.db::org.Hs.eg.db,
+  keys = tested_genes$ensembl_lookup,
+  keytype = "ENSEMBL",
+  column = "ENTREZID",
+  multiVals = "first"
+))
+
+mapped_genes <- tested_genes[!is.na(tested_genes$entrez_id), ]
+```
+
+::: {.callout-tip title="Try it yourself: quantify the mapping loss"}
+Calculate the percentage of `tested_genes` that successfully mapped to an Entrez ID. Which classes of genes (think about gene biotypes) might map poorly, and how could that mapping loss bias your interpretation of the enrichment results?
+
+::: {.callout-tip title="Solution" collapse="true"}
+```{r}
+100 * nrow(mapped_genes) / nrow(tested_genes)
+```
+Non-coding RNAs, pseudogenes, and very recently annotated genes often lack an Entrez entry, so they tend to map poorly. If those gene classes are enriched in one direction of your contrast, mapping loss could make that biology invisible to the enrichment analysis — this is a limitation worth stating explicitly, not a bug to silently ignore.
+:::
+:::
+
+## Defining the background universe
+
+```{r}
+ora_universe <- unique(mapped_genes$entrez_id)
+```
+
+::: {.callout-important}
+## Check your understanding
+Why is `ora_universe` restricted to genes that were actually tested by DESeq2, rather than every gene in `org.Hs.eg.db`?
+
+::: {.callout-tip title="Solution" collapse="true"}
+Over-representation analysis asks: "are my significant genes enriched for this GO term, relative to what I could plausibly have found?" If the background included every annotated human gene — most of which were filtered out in Chapter 3 because they weren't expressed in this tissue at all — the comparison would be unfair, and could make almost any term look artificially enriched simply because expressed genes are not a random sample of the genome.
+:::
+:::
+
+## Running the enrichment analysis
+
+Let's test genes significantly higher in HAT (i.e. `log2FoldChange > 1` in our HAT-vs-SERO contrast).
+
+```{r}
+hat_genes <- mapped_genes[mapped_genes$padj < 0.05 & mapped_genes$log2FoldChange > 1, ]
+nrow(hat_genes)
+```
+
+```{r}
+hat_ora <- clusterProfiler::enrichGO(
+  gene = unique(hat_genes$entrez_id),
+  universe = ora_universe,
+  OrgDb = org.Hs.eg.db::org.Hs.eg.db,
+  keyType = "ENTREZID",
+  ont = "BP",
+  pAdjustMethod = "BH",
+  pvalueCutoff = 0.05,
+  qvalueCutoff = 0.20,
+  minGSSize = 10,
+  maxGSSize = 500,
+  readable = TRUE
+)
+nrow(hat_ora)
+
+write.csv(
+  as.data.frame(hat_ora),
+  file.path("results", "tables", "T11_ORA_higher_in_HAT_TL.csv"),
+  row.names = FALSE
+)
+```
+
+```{r}
+hat_dotplot <- enrichplot::dotplot(hat_ora, showCategory = 15, label_format = 30) +
+  ggtitle("GO enrichment: Biological Processes higher in HAT") +
+  course_theme +
+  theme(axis.text.y = element_text(size = 8))
+
+ggsave(file.path("results", "figures", "T11_ORA_higher_in_HAT_dotplot.png"), hat_dotplot, width = 9, height = 8, dpi = 300)
+hat_dotplot
+```
+
+::: {.callout-note title="Interpretation checkpoint"}
+Pick three enriched terms and inspect their gene counts and adjusted p-values.
+
+- Are any of the terms redundant (describing very similar biology)?
+- Which individual genes appear in more than one of your three chosen terms?
+- State, in your own words, that this result depends on the significance cutoffs, the annotation database version, the identifier mapping step, and the chosen background universe — change any of these and the term list can change too.
+:::
+
+::: {.callout-tip title="Try it yourself"}
+Repeat the enrichment analysis for genes higher in **SERO** instead of HAT, using the same thresholds and the same `ora_universe`. Compare the biological themes that come up. Because the two gene lists are different sizes, avoid comparing the raw number of enriched terms directly — compare the *themes*, not just the counts.
+:::
+
+## Summary
+
+You've now:
+
+- converted Ensembl gene IDs to Entrez IDs and measured the mapping success rate
+- defined a fair background universe for enrichment testing
+- run and visualised a gene ontology over-representation analysis
+- practised interpreting enrichment results as a starting point for further investigation, not a final answer
+
+In the final chapter, we bring the whole workflow together to compare all three sample groups.

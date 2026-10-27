@@ -1,0 +1,946 @@
+<style>
+  .tooltip-text {
+    text-decoration: underline dotted #4a5568 2px; /* Dotted line under the word */
+    text-underline-offset: 3px;                     /* Gives space between text and line */
+    cursor: help;                                  /* Changes mouse pointer to a '?' cursor */
+    background-color: #f7fafc;                     /* Optional subtle background highlight */
+    padding: 0 2px;
+    border-radius: 2px;
+  }
+  
+  .tooltip-text:hover {
+    background-color: #e2e8f0;                     /* Highlight on mouseover */
+  }
+</style>
+<link rel="stylesheet" href="https://unpkg.com/tippy.js@6/themes/light.css" />
+
+# Gene-expression signatures
+
+## What you'll learn
+
+In [Chapter 11](chapter11.qmd), you used hierarchical clustering to arrange samples and genes according to their expression patterns. You then used the clustering results to construct a gene-expression heatmap.
+
+The heatmap suggested that the selected genes do not all follow the same expression pattern. Some genes may be relatively higher in HAT samples, others may be relatively higher in SERO TL+ samples and some may show more variable patterns among individual samples.
+
+In this chapter, we will convert these visual patterns into reproducible groups of genes called **gene-expression signatures**.
+
+We will first divide the gene dendrogram into a selected number of groups. We will then introduce **k-means clustering** as an alternative method for assigning genes to groups and compare the results produced by the two approaches.
+
+Finally, we will inspect the expression pattern represented by each signature and save separate gene lists for functional enrichment analysis in Chapter 13.
+
+::: {.callout-important title="Research question"}
+Can we identify reproducible groups of genes that share similar expression patterns across the HAT and SERO TL+ samples?
+:::
+
+::: {.callout-note title="Learning outcomes"}
+By the end of this chapter, you should be able to:
+
+- explain why a heatmap may contain several distinct gene-expression patterns
+- use `cutree()` to divide a hierarchical gene tree into a selected number of groups
+- explain the difference between hierarchical clustering and k-means clustering
+- explain why k-means requires the number of clusters to be selected in advance
+- run k-means reproducibly using `set.seed()` and multiple starting positions
+- compare gene assignments produced by hierarchical clustering and k-means
+- inspect the expression pattern associated with each gene cluster
+- explain why cluster numbers are arbitrary labels rather than biological rankings
+- describe gene clusters using their observed expression patterns
+- evaluate how the selected number of clusters affects the result
+- create and export a gene-signature membership table
+- prepare separate gene lists for functional enrichment analysis in Chapter 13
+
+**ISCB alignment**: D3 (apply hierarchical clustering and k-means to row-standardised gene-expression data, compare alternative cluster assignments and evaluate the effect of selecting different values of kkk), E3 (organise, validate and export reusable signature-membership tables, analysis objects, figures and gene lists for downstream analysis), F3 (make appropriate use of clustering, visualisation and annotation resources while recognising the assumptions and limitations of each method), H3 (use R to transform expression matrices, run clustering algorithms reproducibly and join, summarise, visualise and save derived data), K3 (describe expression signatures clearly, distinguish arbitrary cluster labels from biological rankings and communicate cautious interpretations that separate co-expression patterns from biological function).
+:::
+
+## Retrieve the minimum required objects
+
+We will continue to use the objects created in earlier chapters that should already be available in your R environment.
+
+::: {.callout-tip collapse="true" title="Recap: If the objects are not available"}
+The code below recreates only the objects required for this chapter. It checks that the fitted DESeq2 object and annotation table are present before loading them.
+
+```{r}
+library(DESeq2)
+library(ggplot2)
+
+required_files <- c(
+  "results/objects/dds_fitted.rds",
+  "human_annotations_from_orgHs.csv"
+)
+
+missing_files <- required_files[!file.exists(required_files)]
+
+if (length(missing_files) > 0) {
+  stop(
+    "The following required files are missing: ",
+    paste(missing_files, collapse = ", ")
+  )
+}
+
+# Load the fitted model and annotation table
+dds_fitted <- readRDS("objects/dds_fitted.rds")
+annotation_data <- read.csv(
+  "human_annotations_from_orgHs.csv",
+  check.names = FALSE,
+  stringsAsFactors = FALSE
+)
+
+# Recreate the HAT-versus-SERO TL+ differential-expression result
+res_hat_vs_sero <- results(
+  dds_fitted,
+  contrast = c("status", "hat", "sero"),
+  alpha = 0.05
+)
+
+result_data <- data.frame(
+  gene_id = rownames(res_hat_vs_sero),
+  as.data.frame(res_hat_vs_sero),
+  row.names = NULL
+)
+
+result_data <- result_data[
+  order(result_data$padj, na.last = TRUE),
+]
+
+# Add readable symbols
+symbol_column <- if ("SYMBOL_SAFE" %in% colnames(annotation_data)) {
+  "SYMBOL_SAFE"
+} else {
+  "SYMBOL"
+}
+
+result_data$symbol <- annotation_data[[symbol_column]][
+  match(result_data$gene_id, annotation_data$ENSEMBL)
+]
+
+missing_symbol <- is.na(result_data$symbol) | result_data$symbol == ""
+result_data$symbol[missing_symbol] <- result_data$gene_id[missing_symbol]
+
+# Transform the counts and retain the two groups used in the comparison
+vsd <- vst(dds_fitted, blind = FALSE)
+sample_info <- as.data.frame(colData(dds_fitted))
+selected_samples <- rownames(sample_info)[
+  sample_info$status %in% c("hat", "sero")
+]
+selected_vst <- assay(vsd)[, selected_samples, drop = FALSE]
+selected_info <- sample_info[selected_samples, , drop = FALSE]
+selected_info$status <- droplevels(selected_info$status)
+
+# Select and standardise the 150 genes used in Chapter 11
+overview_genes <- head(result_data, 150)
+overview_matrix <- selected_vst[
+  overview_genes$gene_id,
+  ,
+  drop = FALSE
+]
+
+overview_z <- t(scale(t(overview_matrix)))
+
+# Recreate the gene clustering
+gene_dist <- dist(overview_z)
+gene_hclust <- hclust(
+  gene_dist,
+  method = "complete"
+)
+```
+
+:::
+
+## From a dendrogram to gene-expression signatures
+
+In the last session, we produced several clustered objects that we visualised using a dendrogram. Although we could see patterns by eye, there was no single point in the dendrogram that is automatically the correct boundary between gene signatures.
+
+We can divide the tree by choosing a number of groups, usually written as $k$. The `cutree()` function then assigns every gene to one of those groups while respecting the branches of the hierarchical clustering.
+
+For this session, we will use **four signatures**. This is a practical choice that provides a small number of patterns that can be inspected during the session. It should not be interpreted as proof that exactly four biological programmes exist in the data.
+
+::: {.callout-tip title="Try it yourself: Predict the effect of cutting the tree"}
+Before running the code, discuss these questions with a partner:
+
+1. What information is already stored in `gene_hclust`?
+2. What new information do we need before we can describe discrete signatures?
+3. If we choose `k = 4`, how many signature labels should be assigned?
+4. Will changing `k` alter the underlying expression values?
+5. Will signature number 1 necessarily represent the most important biological pattern?
+:::
+
+::: {.callout-note title="Possible answers" collapse="true"}
+1. `gene_hclust` stores the hierarchical relationships among the 150 genes, including the order in which genes and branches join.
+2. We need to define where the tree will be divided and assign each gene to a discrete group.
+3. Four different signature labels will be used, but all 150 genes will receive one label.
+4. No. Changing `k` changes how the dendrogram is partitioned, not the expression values or the original hierarchical clustering.
+5. No. The signature numbers are identifiers assigned by the algorithm. They do not rank biological importance, statistical evidence or expression level.
+:::
+
+## Assign genes to four hierarchical signatures
+
+Use `cutree()` to divide the gene dendrogram into four groups:
+
+```{r}
+signature_number <- 4
+
+signature_assignment <- cutree(
+  gene_hclust,
+  k = signature_number
+)
+
+head(signature_assignment)
+```
+
+The returned object is a named vector:
+
+- each **name** is a stable gene identifier
+- each **value** is the signature number assigned to that gene
+
+Check that every selected gene has been assigned exactly once:
+
+```{r}
+length(signature_assignment)
+table(signature_assignment)
+```
+
+The total of the values displayed by `table()` should be 150. The signatures do not need to contain equal numbers of genes.
+
+::: {.callout-tip title="Try it yourself: Validate the assignments"}
+Use the objects above to answer these questions:
+
+1. How many genes are assigned to each signature?
+2. Do all four signature numbers occur?
+3. Are the names of `signature_assignment` the same genes as the row names of `overview_z`?
+4. Why is it useful to check the gene identifiers rather than only checking that both objects contain 150 rows?
+
+Try to write an `identical()` statement for question 3 before revealing the answer.
+:::
+
+::: {.callout-note title="Possible answers" collapse="true"}
+```{r}
+table(signature_assignment)
+
+identical(
+  names(signature_assignment),
+  rownames(overview_z)
+)
+```
+
+The `identical()` check should return `TRUE`. Two objects can have the same dimensions while containing different genes or containing the same genes in a different order. Checking the identifiers protects against attaching signature labels to the wrong rows.
+:::
+
+## Create a reusable signature table
+
+A named vector is sufficient for calculations, but a data frame will be easier to inspect, join and save. Create one row for each gene:
+
+```{r}
+signature_table <- data.frame(
+  gene_id = names(signature_assignment),
+  signature = as.integer(signature_assignment),
+  row.names = NULL
+)
+
+head(signature_table)
+```
+
+Add the readable gene symbols and differential-expression results by matching stable gene identifiers:
+
+```{r}
+result_match <- match(
+  signature_table$gene_id,
+  result_data$gene_id
+)
+
+signature_table$symbol <- result_data$symbol[result_match]
+signature_table$log2FoldChange <- result_data$log2FoldChange[result_match]
+signature_table$padj <- result_data$padj[result_match]
+
+head(signature_table)
+```
+
+Check that every row has a differential-expression match:
+
+```{r}
+sum(is.na(result_match))
+```
+
+This should return `0`. Some adjusted p-values could still be missing in a general results table, but the 150 genes selected here were ordered to prioritise non-missing adjusted p-values.
+
+::: {.callout-tip title="Try it yourself: Read the signature table"}
+Examine `signature_table` and answer these questions:
+
+1. What does one row represent?
+2. Which column records the expression-pattern group?
+3. Which column tells you the direction and size of the HAT-versus-SERO TL+ difference?
+4. Does a shared signature number mean that the genes have identical expression values?
+5. Does a shared signature number show that the genes have the same biological function?
+:::
+
+::: {.callout-note title="Possible answers" collapse="true"}
+1. One row represents one of the 150 selected genes.
+2. `signature` records the group produced by cutting the gene dendrogram.
+3. `log2FoldChange` records the estimated HAT-versus-SERO TL+ expression difference. Positive values indicate higher expression in HAT under the specified contrast, while negative values indicate lower expression in HAT.
+4. No. Genes in the same signature have relatively similar row-standardised patterns, but their values are not identical.
+5. No. Co-expression can generate a biological hypothesis, but a shared function must be investigated using gene annotation, functional enrichment or other evidence.
+:::
+
+## Use k-means as an alternative clustering method
+
+Hierarchical clustering begins by treating every gene as a separate group and then progressively joins the most similar genes or branches. The result is a dendrogram that can be cut at different heights or into a selected number of groups.
+
+K-means does not construct a dendrogram. Instead, we choose the number of clusters in advance and the algorithm searches for cluster centres that minimise the variation of genes around those centres.
+
+For a fair comparison, we will apply k-means to the same row-standardised expression matrix and request the same number of groups.
+
+::: {.callout-tip title="Try it yourself: Compare the methods before running them"}
+Discuss these questions with a partner:
+
+1. Which method produces a tree?
+2. Which method requires the number of clusters to be specified before fitting?
+3. Why should both methods use the same expression matrix here?
+4. Do you expect the two methods to assign every gene in exactly the same way?
+5. Why might running k-means twice produce different assignments unless we control the random starting positions?
+:::
+
+::: {.callout-note title="Possible answers" collapse="true"}
+1. Hierarchical clustering produces a tree or dendrogram.
+2. K-means requires the number of clusters, `centers`, to be selected before the algorithm is run.
+3. Using the same matrix means that differences in assignment reflect the clustering methods rather than different genes or transformations.
+4. Not necessarily. The methods optimise different criteria and represent relationships differently.
+5. K-means begins from initial cluster centres. Different random starting positions can lead to different local solutions. `set.seed()` makes the random choices reproducible.
+:::
+
+Run k-means using a fixed random seed and 50 starting positions:
+
+```{r}
+set.seed(1201)
+
+gene_kmeans <- kmeans(
+  overview_z,
+  centers = signature_number,
+  nstart = 50
+)
+
+table(gene_kmeans$cluster)
+```
+
+`nstart = 50` runs the algorithm from 50 different initial configurations and retains the result with the smallest total within-cluster sum of squares among those runs. This reduces the risk of reporting a poor solution from one starting configuration, although it does not prove that the selected value of $k$ is biologically correct.
+
+Create a reusable k-means membership table:
+
+```{r}
+kmeans_table <- data.frame(
+  gene_id = names(gene_kmeans$cluster),
+  kmeans_signature = as.integer(gene_kmeans$cluster),
+  row.names = NULL
+)
+
+kmeans_table$symbol <- result_data$symbol[
+  match(kmeans_table$gene_id, result_data$gene_id)
+]
+
+head(kmeans_table)
+```
+
+::: {.callout-warning title="Cluster numbers are arbitrary"}
+Hierarchical signature 1 and k-means signature 1 are not automatically equivalent. The numbers are labels, not ranks, effect sizes or biological categories. Two equivalent solutions can use different numbers for the same groups.
+:::
+
+## Compare hierarchical clustering and k-means
+
+Join the two assignments using the stable gene identifiers:
+
+```{r}
+cluster_comparison <- signature_table
+
+cluster_comparison$kmeans_signature <- kmeans_table$kmeans_signature[
+  match(
+    cluster_comparison$gene_id,
+    kmeans_table$gene_id
+  )
+]
+
+table(
+  hierarchical = cluster_comparison$signature,
+  kmeans = cluster_comparison$kmeans_signature
+)
+```
+
+The contingency table shows how genes from each hierarchical signature are distributed among the k-means signatures. Look for cells containing many genes, but remember that the row and column numbers do not need to match.
+
+We can also compare whether pairs of genes are placed together by both methods. This comparison is not affected by the arbitrary cluster labels:
+
+```{r}
+hierarchical_together <- outer(
+  cluster_comparison$signature,
+  cluster_comparison$signature,
+  FUN = "=="
+)
+
+kmeans_together <- outer(
+  cluster_comparison$kmeans_signature,
+  cluster_comparison$kmeans_signature,
+  FUN = "=="
+)
+
+upper_pairs <- upper.tri(hierarchical_together)
+
+pair_agreement <- mean(
+  hierarchical_together[upper_pairs] ==
+    kmeans_together[upper_pairs]
+)
+
+pair_agreement
+```
+
+A value near 1 means that the methods usually agree about whether pairs of genes belong together. It does not show that either clustering is biologically correct.
+
+::: {.callout-tip title="Try it yourself: Compare the assignments"}
+Use the contingency table and `pair_agreement` to answer these questions:
+
+1. Does each hierarchical signature correspond mainly to one k-means signature?
+2. Are any hierarchical signatures divided across several k-means signatures?
+3. Are any k-means signatures assembled from several hierarchical branches?
+4. Why would comparing signature 1 with signature 1 directly be misleading?
+5. What does pair agreement capture that direct label matching does not?
+6. What evidence, beyond agreement between two algorithms, would be needed to support a biological interpretation?
+:::
+
+::: {.callout-note title="Possible answers" collapse="true"}
+The numerical result should be interpreted from your output. A strong comparison should note that:
+
+- large cells in the contingency table indicate groups of genes often placed together by both methods
+- split rows or columns show genes assigned differently by the two methods
+- the cluster labels themselves are arbitrary, so identical numbers do not establish correspondence
+- pair agreement compares the grouping structure without requiring the labels to match
+- agreement between algorithms supports robustness to method choice, but biological interpretation still requires annotation, enrichment or other independent evidence
+:::
+
+## Evaluate the selected number of signatures
+
+Both `cutree()` and k-means require an analytical choice about the number of groups when used in this way. Repeat the clustering for three and five groups and compare the group sizes:
+
+```{r}
+for (candidate_k in c(3, 4, 5)) {
+  hierarchical_candidate <- cutree(
+    gene_hclust,
+    k = candidate_k
+  )
+
+  set.seed(1201)
+  kmeans_candidate <- kmeans(
+    overview_z,
+    centers = candidate_k,
+    nstart = 50
+  )
+
+  cat("Number of groups:", candidate_k, "\n")
+  cat("Hierarchical group sizes:\n")
+  print(table(hierarchical_candidate))
+  cat("K-means group sizes:\n")
+  print(table(kmeans_candidate$cluster))
+  cat("\n")
+}
+```
+
+::: {.callout-tip title="Try it yourself: Evaluate the choice of k"}
+1. What happens to the average group size as $k$ increases?
+2. Does either method produce a very small group for any tested value?
+3. What is gained by selecting more groups?
+4. What is lost by selecting more groups?
+5. Why is `k = 4` a useful working resolution rather than a uniquely correct answer?
+:::
+
+::: {.callout-note title="Possible answers" collapse="true"}
+As $k$ increases, the broad patterns are divided into smaller and more detailed groups. This can reveal sub-patterns, but it also increases complexity and can produce small groups that are difficult to interpret or test in enrichment analysis. A smaller $k$ gives a simpler summary but may combine distinct patterns. Here, `k = 4` provides a manageable resolution for comparison and downstream interpretation; it is an explicit analytical choice rather than a proven biological truth.
+:::
+
+## Add signature labels to the expression data
+
+To visualise individual genes and signature summaries, reshape the row-standardised matrix into one row per gene-sample combination:
+
+```{r}
+signature_expression <- as.data.frame(
+  as.table(overview_z)
+)
+
+colnames(signature_expression) <- c(
+  "gene_id",
+  "sample_id",
+  "z_score"
+)
+
+signature_expression$gene_id <- as.character(
+  signature_expression$gene_id
+)
+
+signature_expression$sample_id <- as.character(
+  signature_expression$sample_id
+)
+```
+
+Add the signature number and sample status:
+
+```{r}
+signature_expression$signature <- signature_table$signature[
+  match(
+    signature_expression$gene_id,
+    signature_table$gene_id
+  )
+]
+
+signature_expression$status <- selected_info$status[
+  match(
+    signature_expression$sample_id,
+    rownames(selected_info)
+  )
+]
+
+signature_expression$signature <- factor(
+  signature_expression$signature,
+  levels = 1:signature_number,
+  labels = paste("Signature", 1:signature_number)
+)
+
+head(signature_expression)
+```
+
+Each gene occurs once for every selected sample. With 150 genes and 15 samples, how many rows should this data frame contain?
+
+::: {.callout-tip title="Suggested answer" collapse="true"}
+The data frame should contain:
+
+$$
+150 \times 15 = 2250
+$$
+
+rows. Check this using:
+
+```{r}
+dim(signature_expression)
+```
+
+The expected result is 2,250 rows and five columns.
+:::
+
+## Summarise the average pattern within each signature
+
+A heatmap displays every selected gene, but it can be difficult to compare several large groups at once. We can summarise each signature by calculating the mean row z-score for every signature and sample.
+
+```{r}
+signature_summary <- aggregate(
+  z_score ~ signature + sample_id + status,
+  data = signature_expression,
+  FUN = mean
+)
+
+colnames(signature_summary)[
+  colnames(signature_summary) == "z_score"
+] <- "mean_z_score"
+
+head(signature_summary)
+```
+
+One row of `signature_summary` represents the average row-standardised expression of all genes in one signature for one sample.
+
+::: {.callout-warning title="What does an average signature score mean?"}
+The mean z-score summarises a group of genes that were clustered using their expression patterns. It is useful for displaying the broad pattern, but it can hide variation among genes within the signature.
+
+The score is not an absolute expression value, a pathway activity measurement or a clinical biomarker. It is a descriptive summary of the selected and standardised genes in this dataset.
+:::
+
+Check the size of the summary:
+
+```{r}
+dim(signature_summary)
+```
+
+There are four signatures and 15 samples, so the summary should contain 60 rows.
+
+## Plot the signature profiles
+
+We can plot the average signature score for each sample. The samples will remain separate points, while a line will connect the values in their existing order within each status group.
+
+```{r}
+signature_summary$sample_id <- factor(
+  signature_summary$sample_id,
+  levels = colnames(overview_z)
+)
+
+signature_profile_plot <- ggplot(
+  signature_summary,
+  aes(
+    x = sample_id,
+    y = mean_z_score,
+    colour = status,
+    group = status
+  )
+) +
+  geom_hline(
+    yintercept = 0,
+    colour = "grey70",
+    linetype = "dashed"
+  ) +
+  geom_line() +
+  geom_point(size = 2) +
+  facet_wrap(
+    ~ signature,
+    ncol = 2
+  ) +
+  labs(
+    title = "Average expression pattern of each gene signature",
+    x = "Sample",
+    y = "Mean row z-score",
+    colour = "Status"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(
+      angle = 45,
+      hjust = 1
+    )
+  )
+
+signature_profile_plot
+```
+
+The dashed horizontal line marks a mean row z-score of zero. Values above zero indicate that the genes in that signature tend to have expression above their own gene-specific means in that sample. Values below zero indicate that they tend to have expression below their own means.
+
+The connecting lines help the eye follow samples belonging to the same status. They do not represent a time series or a continuous biological trajectory.
+
+::: {.callout-tip title="Try it yourself: Interpret the signature profiles"}
+With a partner, discuss the following questions:
+
+1. Which signatures tend to have higher mean scores in HAT samples?
+2. Which signatures tend to have higher mean scores in SERO TL+ samples?
+3. Are any signatures approximately mirror images of one another?
+4. Is there variation among samples with the same status?
+5. Does every sample follow the dominant pattern of its status group?
+6. What information has been lost by replacing the individual gene values with a mean signature score?
+7. Why should the profile plot be interpreted alongside the Chapter 11 heatmap?
+
+Complete the interpretation below:
+
+`# The four signatures summarise ________. Signature(s) ________ tend to have higher relative expression in HAT, whereas signature(s) ________ tend to have higher relative expression in SERO TL+. However, ________ and the signatures should not yet be interpreted as biological pathways.`
+:::
+
+::: {.callout-note title="Possible answers" collapse="true"}
+The exact appearance should be read from your rendered figure. A suitable interpretation should include the following points:
+
+- each panel summarises one group of genes with similar row-standardised expression patterns
+- contrasting signatures may show higher mean scores in different status groups
+- samples within a status group do not need to have identical scores
+- the mean profile hides differences among individual genes
+- the selected genes came from the HAT-versus-SERO TL+ comparison, so separation by status is expected
+- signature membership alone does not establish shared biological function
+
+A possible structure is:
+
+`# The four signatures summarise contrasting expression patterns among the 150 genes prioritised by the HAT-versus-SERO TL+ comparison. Some signatures tend to have higher relative expression in HAT samples, while others tend to have higher relative expression in SERO TL+ samples. There is still variation among samples and among genes within each signature. The signatures are therefore useful descriptive groups, but they should not yet be interpreted as biological pathways.`
+:::
+
+## Compare the summary with individual genes
+
+The mean profile is useful only if we remember what it summarises. We can display the individual gene trajectories behind each signature using thin, semi-transparent lines and overlay the signature mean.
+
+Apply the same sample order to the individual-gene data before plotting:
+
+```{r}
+signature_expression$sample_id <- factor(
+  signature_expression$sample_id,
+  levels = colnames(overview_z)
+)
+
+signature_gene_plot <- ggplot(
+  signature_expression,
+  aes(
+    x = sample_id,
+    y = z_score,
+    group = gene_id
+  )
+) +
+  geom_line(
+    colour = "grey65",
+    alpha = 0.25,
+    linewidth = 0.35
+  ) +
+  geom_line(
+    data = signature_summary,
+    aes(
+      x = sample_id,
+      y = mean_z_score,
+      group = 1
+    ),
+    colour = "black",
+    linewidth = 1,
+    inherit.aes = FALSE
+  ) +
+  facet_wrap(
+    ~ signature,
+    ncol = 2
+  ) +
+  labs(
+    title = "Individual genes and average signature profiles",
+    subtitle = "Grey lines show genes; black lines show signature means",
+    x = "Sample",
+    y = "Row z-score"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(
+      angle = 45,
+      hjust = 1
+    )
+  )
+
+signature_gene_plot
+```
+
+::: {.callout-tip title="Try it yourself: Evaluate the summary"}
+1. Do all genes in a signature follow the black mean line equally closely?
+2. Which signature appears most internally consistent?
+3. Which signature appears most heterogeneous?
+4. Could two genes have similar broad patterns but different effect sizes?
+5. Why would reporting only the mean profile risk over-simplifying the data?
+:::
+
+::: {.callout-note title="Possible answers" collapse="true"}
+1. No. Hierarchical clustering groups relatively similar patterns, but genes within a branch still vary.
+2. The most internally consistent signature will have grey lines that remain relatively close to one another and to the black mean line.
+3. A heterogeneous signature will show wider dispersion or sub-patterns among its grey lines.
+4. Yes. The clustering used row z-scores, which emphasise the shape of each gene's pattern rather than its absolute expression or differential-expression effect size.
+5. A mean can conceal sub-patterns, unusual genes and differences in within-signature consistency. The mean profile should therefore be shown or interpreted with the individual-gene heatmap or trajectory plot.
+:::
+
+## Reorder the heatmap by signature
+
+In Chapter 11, the heatmap rows followed the complete gene dendrogram. We can now retain the dendrogram order while adding the new signature assignments. This places genes from the same branch together and allows the discrete signatures to be seen in the plotting data.
+
+```{r}
+gene_order <- gene_hclust$labels[
+  gene_hclust$order
+]
+
+signature_heatmap_data <- signature_expression
+
+signature_heatmap_data$gene_id <- factor(
+  signature_heatmap_data$gene_id,
+  levels = rev(gene_order)
+)
+
+signature_heatmap_data$sample_id <- factor(
+  signature_heatmap_data$sample_id,
+  levels = colnames(overview_z)
+)
+
+signature_heatmap <- ggplot(
+  signature_heatmap_data,
+  aes(
+    x = sample_id,
+    y = gene_id,
+    fill = z_score
+  )
+) +
+  geom_tile() +
+  facet_grid(
+    signature ~ .,
+    scales = "free_y",
+    space = "free_y"
+  ) +
+  scale_fill_viridis_c(
+    name = "Row z-score"
+  ) +
+  labs(
+    title = "Gene-expression signatures across samples",
+    subtitle = "Genes retain their hierarchical-clustering order within signatures",
+    x = "Sample",
+    y = "Selected genes"
+  ) +
+  theme_minimal() +
+  theme(
+    panel.grid = element_blank(),
+    axis.text.x = element_text(
+      angle = 45,
+      hjust = 1
+    ),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank()
+  )
+
+signature_heatmap
+```
+
+The faceting does not recalculate the clustering. It displays the existing gene assignments as separate horizontal sections.
+
+::: {.callout-tip title="Try it yourself: Compare Chapters 11 and 12"}
+Compare this figure with the clustered expression heatmap from Chapter 11.
+
+1. What information is the same in both heatmaps?
+2. What new information is provided by the signature labels?
+3. Has the expression matrix changed?
+4. Has the gene dendrogram changed?
+5. What analytical choice determines the number of horizontal sections?
+6. Why would a different value of `signature_number` produce a different visual summary without making either result automatically wrong?
+:::
+
+::: {.callout-note title="Possible answers" collapse="true"}
+1. Both heatmaps use the same 150 genes, samples and row z-scores.
+2. The new heatmap marks a discrete partition of the continuous gene dendrogram.
+3. No. The same `overview_z` values are displayed.
+4. No. The existing dendrogram has been cut into groups; the hierarchical clustering has not been recalculated.
+5. The selected value of `signature_number`, supplied as `k` to `cutree()`, determines the number of sections.
+6. A dendrogram can be cut at several resolutions. Smaller values of `k` produce broader summaries, while larger values produce more detailed groups. The appropriate resolution depends on the analytical purpose, stability and interpretability and should be reported transparently.
+:::
+
+## Save the signature outputs
+
+The most important product of this chapter is not only a figure. The table linking each stable gene identifier to a signature can be reused in the next session.
+
+First, write the signature assignments and summary scores to the `results` directory:
+
+```{r}
+write.csv(
+  signature_table,
+  file = "results/gene_expression_signatures.csv",
+  row.names = FALSE
+)
+
+write.csv(
+  signature_summary,
+  file = "results/gene_expression_signature_scores.csv",
+  row.names = FALSE
+)
+```
+
+Save the complete objects needed to reproduce or extend the analysis:
+
+```{r}
+saveRDS(
+  cluster_comparison,
+  file = "results/objects/gene_expression_signatures.rds"
+)
+```
+
+Save the complete membership comparison as a CSV file:
+
+```{r}
+write.csv(
+  cluster_comparison,
+  file = "results/gene_expression_signature_membership.csv",
+  row.names = FALSE
+)
+```
+
+For functional enrichment, create one plain-text gene list for each hierarchical signature. Each file contains one stable gene identifier per line:
+
+```{r}
+for (current_signature in sort(unique(signature_table$signature))) {
+  signature_genes <- signature_table$gene_id[
+    signature_table$signature == current_signature
+  ]
+
+  writeLines(
+    signature_genes,
+    con = paste0(
+      "results/signature_gene_lists/",
+      "hierarchical_signature_",
+      current_signature,
+      ".txt"
+    )
+  )
+}
+```
+
+Use the hierarchical signatures as the primary lists for Chapter 13 because they follow directly from the dendrogram constructed in Chapter 11. The k-means comparison is retained in the membership table as a check on sensitivity to clustering method.
+
+Finally, save the three figures to the `figures` directory:
+
+```{r}
+ggsave(
+  filename = "figures/gene_expression_signature_profiles.png",
+  plot = signature_profile_plot
+)
+
+ggsave(
+  filename = "figures/gene_expression_signature_genes.png",
+  plot = signature_gene_plot
+)
+
+ggsave(
+  filename = "figures/gene_expression_signature_heatmap.png",
+  plot = signature_heatmap
+)
+```
+
+::: {.callout-tip title="Try it yourself: Check the saved outputs"}
+Use `file.exists()` to check that the reusable signature table and the signature heatmap were saved successfully.
+:::
+
+::: {.callout-note title="Suggested answer" collapse="true"}
+```{r}
+file.exists(
+  "results/gene_expression_signatures.csv"
+)
+
+file.exists(
+  "figures/gene_expression_signature_heatmap.png"
+)
+
+list.files(
+  "results/signature_gene_lists",
+  pattern = "hierarchical_signature_.*\\.txt$"
+)
+```
+
+Both `file.exists()` statements should return `TRUE`, and `list.files()` should return four signature gene-list files.
+:::
+
+## Integrate the evidence
+
+We have now moved through three related levels of the analysis:
+
+1. **Differential expression** prioritised genes associated with the HAT-versus-SERO TL+ comparison.
+2. **Hierarchical clustering** arranged the selected genes according to their row-standardised expression patterns.
+3. **Tree cutting** converted the continuous gene dendrogram into four descriptive signatures.
+4. **K-means clustering** provided an alternative assignment based on four cluster centres.
+5. **Method comparison** showed which gene relationships were retained or changed when the clustering approach was altered.
+
+::: {.callout-important title="Try it yourself: Write a cautious signature interpretation"}
+Use the Chapter 11 heatmap, the signature plots and the `signature_table` to write a short interpretation.
+
+Your interpretation should:
+
+1. state how the genes were selected
+2. state how the signatures were produced
+3. describe at least one contrasting expression pattern
+4. acknowledge variation among genes or samples
+5. explain why the signatures do not yet establish shared biological function
+6. identify the next analysis needed to investigate possible function
+
+Use this structure if helpful:
+
+`# The 150 genes were selected using ________. Hierarchical clustering and tree cutting divided these genes into ________ signatures. The profiles show ________. However, ________. We would next use ________ to investigate whether the genes in each signature are associated with shared biological processes.`
+:::
+
+::: {.callout-note title="Possible answer" collapse="true"}
+The 150 genes were selected using adjusted p-values from the HAT-versus-SERO TL+ differential-expression comparison. Their row-standardised VST expression patterns were hierarchically clustered and the resulting gene dendrogram was divided into four signatures. The signature profiles summarise contrasting patterns across HAT and SERO TL+ samples, while also showing variation among samples and among genes assigned to the same signature. Because the genes were selected using the same comparison displayed in the figures, these patterns are not independent confirmation of status differences. Co-expression also does not demonstrate shared biological function. Functional enrichment analysis would be needed to test whether the genes in each signature are associated with particular biological processes, molecular functions or cellular components.
+:::
+
+## Summary
+
+In this chapter, you:
+
+- continued from the row-standardised gene matrix and hierarchical clustering created in Chapter 11
+- used `cutree()` to divide a continuous gene dendrogram into four hierarchical signatures
+- used `set.seed()` and `nstart` to run k-means reproducibly on the same expression matrix
+- compared hierarchical and k-means assignments without assuming that cluster numbers matched
+- evaluated how changing the selected number of groups altered the resolution of the result
+- validated gene assignments and joined them to symbols and differential-expression results
+- calculated a mean expression profile for each hierarchical signature and sample
+- compared signature means with the individual genes from which they were calculated
+- displayed the hierarchical signatures as separate sections of a clustered heatmap
+- saved membership tables, signature scores, figures and separate gene lists
+- distinguished data-derived co-expression signatures from established biological functions
+
+A gene-expression signature is a reproducible grouping under a stated dataset, transformation, distance measure, clustering method and choice of $k$. Agreement between hierarchical clustering and k-means can increase confidence that a broad pattern is not specific to one algorithm. However, neither agreement nor a cluster label tells us what the genes do.
+
+In [Chapter 13](chapter13.qmd), we will use **functional enrichment analysis** to investigate whether genes within the hierarchical signatures are associated with shared biological processes. The files in `results/signature_gene_lists` will provide the gene lists for that analysis. Enrichment will add functional context, but it will still need to be interpreted carefully because the result depends on the selected genes, background set, annotation database and statistical method.
+
+<script>
+  tippy('[data-tippy-content]');
+</script>

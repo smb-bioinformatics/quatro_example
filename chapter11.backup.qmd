@@ -1,0 +1,1111 @@
+# Pattern discovery, hierarchical clustering and heatmaps
+
+## What you'll learn
+
+In [Chapter 6](chapter06.qmd), we compared the overall expression profiles of samples. In the PCA, similar samples appeared near one another. In the sample-distance heatmap, similar samples had smaller pairwise distances.
+
+In this chapter, we will use the same idea of similarity to arrange samples into groups. This process is called **clustering**.
+
+Clustering does not begin with the **HAT** and **SERO TL+** labels. Instead, it groups objects according to patterns in the expression data. We can then compare the resulting groups with the known sample information. Because group labels are not used to construct the clustering, this is called <span class="tooltip-text" data-tippy-content="Unsupervised methods identify patterns in the data without using predefined outcome labels to determine the result.">unsupervised</span> clustering.
+
+Hierarchical clustering displays relationships as a branching diagram called a **dendrogram**. Samples or genes that join at relatively low branch heights are more similar under the selected distance and linkage rules. Objects or groups that join higher in the tree are less similar.
+
+A clustered heatmap combines three types of information:
+
+- the coloured cells show expression values;
+- the column order shows relationships among samples;
+- the row order shows relationships among genes.
+
+::: {.callout-important}
+Remember, clustering can reveal structure that is consistent with status but it cannot show that disease status caused that structure.
+:::
+
+::: {.callout-note title="Learning outcomes"}
+By the end of this chapter, you should be able to:
+
+- distinguish between ordering samples by clustering and ordering genes by - statistical evidence
+- explain why gene-expression values are standardised within each gene for a - pattern-focused heatmap
+- use a sample dendrogram to determine heatmap column order
+- construct and interpret a sample-ordered heatmap using ggplot2 and geom_tile()
+- explain how gene selection, scaling, distance and linkage affect the resulting visualisation
+- prepare a reproducible matrix for gene clustering in the next chapter
+
+**ISCB competency framework v3 alignment:** B3, D3, E3, F3 and H3, mainly at application level. The session emphasises established bioinformatics methods, data-structure checks, reproducible analysis, visualisation and cautious biological interpretation.
+:::
+
+## Retrieve the previous analysis objects
+
+We will continue to use the objects created in earlier chapters that should already be available in your R environment.
+
+::: {.callout-tip collapse="true" title="Recap: If the objects are not available"}
+```{r}
+#| message: false
+#| warning: false
+
+library(DESeq2)
+library(ggplot2)
+
+# Load the fitted model created previously
+dds_fitted <- readRDS("results/objects/dds_fitted.rds")
+
+# Retrieve aligned sample information
+sample_info <- as.data.frame(colData(dds_fitted))
+
+# Recreate the HAT-versus-SERO TL+ result
+res_hat_vs_sero <- results(
+  dds_fitted,
+  contrast = c("status", "hat", "sero"),
+  alpha = 0.05
+)
+
+# Create a results data frame with stable gene identifiers
+result_data <- data.frame(
+  gene_id = rownames(res_hat_vs_sero),
+  as.data.frame(res_hat_vs_sero),
+  row.names = NULL
+)
+
+# Add readable gene symbols
+annotation_data <- read.csv(
+  "human_annotations_from_orgHs.csv",
+  check.names = FALSE,
+  stringsAsFactors = FALSE
+)
+
+symbol_column <- if ("SYMBOL_SAFE" %in% colnames(annotation_data)) {
+  "SYMBOL_SAFE"
+} else {
+  "SYMBOL"
+}
+
+result_data$symbol <- annotation_data[[symbol_column]][
+  match(result_data$gene_id, annotation_data$ENSEMBL)
+]
+
+missing_symbol <- is.na(result_data$symbol) | result_data$symbol == ""
+result_data$symbol[missing_symbol] <- result_data$gene_id[missing_symbol]
+
+# Transform counts for exploratory visualisation
+vsd <- vst(dds_fitted, blind = FALSE)
+vst_values <- assay(vsd)
+
+# Retain the two groups used in this comparison
+selected_samples <- rownames(sample_info)[
+  sample_info$status %in% c("hat", "sero")
+]
+
+selected_vst <- vst_values[
+  ,
+  selected_samples
+]
+
+selected_vsd <- vsd[
+  ,
+  selected_samples
+]
+
+selected_info <- sample_info[
+  selected_samples,
+]
+
+selected_info$status <- droplevels(selected_info$status)
+```
+:::
+
+Before continuing, check that the sample order agrees between the expression matrix and metadata:
+
+```{r}
+identical(
+  colnames(selected_vst),
+  rownames(selected_info)
+)
+```
+
+This check should return `TRUE`.
+
+## Introduction to hierarchical clustering
+
+In [Chapter 6](chapter06.qmd), each point in the PCA represented a sample and the sample-distance heatmap represented every pairwise sample comparison. Hierarchical clustering uses the same general distance information but presents it as a branching tree.
+
+::: {.callout-tip title="Try it yourself: Clustering without R"}
+Consider this small expression matrix:
+
+```text
+         sample_1 sample_2 sample_3 sample_4
+gene_A       2        3        8        9
+gene_B       3        3        9        8
+```
+
+1. Which two samples look most similar?
+2. Which other two samples look similar?
+3. If you divided the samples into two groups, what would they be?
+4. How could you represent the sequence in which the samples were grouped?
+:::
+
+::: {.callout-note collapse="true" title="Possible Solution"}
+1. `sample_1` and `sample_2` look most similar. Gene A differs by 1 and Gene B has the same value in both samples.
+
+2. `sample_3` and `sample_4` also look similar. Both samples have relatively high values for Gene A and Gene B.
+
+3. A possible grouping is:
+
+   - **Group 1:** `sample_1` and `sample_2`
+   - **Group 2:** `sample_3` and `sample_4`
+
+4. The sequence can be represented using a dendrogram:
+
+```text
+          ┌─ sample_1
+      ┌───┤
+      │   └─ sample_2
+──────┤
+      │   ┌─ sample_3
+      └───┤
+          └─ sample_4
+```
+
+Samples that join at a lower height are more similar according to the measurements used for clustering. The two larger groups join at a higher height because their profiles are less similar.
+
+The groups were identified from the expression values. We did not use predefined sample labels to construct them.
+:::
+
+In real RNA-seq data, each sample is described by expression measurements for thousands of genes. We therefore use a distance measure to summarise the difference between every pair of sample profiles.
+
+## Predict before running
+
+Before constructing the dendrogram, use the [Chapter 6](chapter06.qmd) PCA and sample-distance heatmap to predict what the clustering might show.
+
+::: {.callout-tip title="Try it yourself: Predict before running"}
+Discuss these questions with a partner:
+
+1. Did the HAT and SERO TL+ samples form separate, overlapping or unclear groups in the PCA?
+2. Which samples do you predict will join at relatively low heights in the dendrogram?
+3. Do you expect all samples with the same status to be equally similar? Why or why not?
+4. If one sample does not appear where predicted, what information should be checked before drawing a conclusion?
+
+:::
+
+::: {.callout-note title="Possible Solution" collapse="true"}
+1. The PCA suggested some separation between HAT and SERO TL+ samples, so samples with the same status may appear more often within the same larger branches.
+
+2. Samples that appeared close in the PCA, or had small pairwise distances, may join at relatively low heights.
+
+3. Samples with the same status will not necessarily be equally similar. Biological variation, sample composition, technical variation and other measured or unmeasured factors can contribute to differences among individuals.
+
+4. An unexpected position does not automatically make a sample incorrect or unusable. We should compare the dendrogram with the PCA, pairwise distances, sample metadata, quality-control information and processing information before drawing a conclusion.
+:::
+
+## Reuse the Chapter 6 sample distances
+
+In Chapter 6, we transposed the VST matrix so that samples were in rows and then calculated Euclidean distances between samples. We can use a similar statement to recreate the distance object required by `hclust()`, although we do not need to convert the result into a matrix because `hclust()` uses the `dist` object directly.
+
+```{r}
+# extract vst values from the selected matrix containing just hat and sero samples
+selected_vst <- assay(selected_vsd)
+
+# transpose and place samples in rows
+sample_by_gene <- t(selected_vst)
+
+# Calculate the distance between every pair of samples
+sample_dist <- dist(sample_by_gene)
+
+# Inspect the first few distances
+head(sample_dist)
+```
+
+A smaller distance represents more similar expression profiles. 
+
+## Build the sample dendrogram
+
+Hierarchical clustering begins with each sample in its own group. It repeatedly joins samples or groups until all samples are connected.
+
+After two samples have been joined, the algorithm needs a rule for comparing that group with other samples or groups. This rule is called the **linkage method**.
+
+We will use **complete linkage**. Complete linkage defines the distance between two groups using the most distant pair of samples, with one sample taken from each group. This tends to favour groups whose members are all reasonably similar.
+
+```{r}
+# cluster samples using a complete method
+sample_hclust_all_genes <- hclust(
+  sample_dist,
+  method = "complete"
+)
+```
+
+There is no universally correct linkage method. Different methods define the distance between groups in different ways and can therefore produce different dendrograms. However, `complete` is the default method used by `hclust()` and most commonly used approach.
+
+## Plot the dendrogram
+
+We can now draw the dendrogram. Unfortunatelty, `ggplot2` doesn't have a layer for dendrograms but luckily the `ggdendro` package provides a `ggdendrogram()` helper function. It takes the specialised object created by `hclust()` and displays it as a figure that is compatible with `ggplot2`.
+
+This is similar to our previous use of the `ggrepel` package. Rather than calculating all the label positions ourselves, we used the `geom_label_repel()` helper to position labels clearly. Here, `ggdendrogram()` handles the branch and sample-label positions needed to display a dendrogram.
+
+First we have to load the package:
+
+```{r}
+library(ggdendro)
+```
+
+We can now create and store the dendrogram:
+
+```{r}
+# Create a ggplot2-compatible dendrogram
+sample_dendrogram <- ggdendrogram(
+  sample_hclust_all_genes,
+  rotate = FALSE
+) +
+  labs(
+    title = "Hierarchical clustering of samples",
+    subtitle = "Euclidean distance; complete linkage",
+    x = "Sample",
+    y = "Merge height"
+  )
+
+# Display the dendrogram
+sample_dendrogram
+```
+
+The argument `rotate = FALSE` places the sample labels along the bottom of the dendrogram. Changing this to `rotate = TRUE` would display the dendrogram horizontally.
+
+The dendrogram is stored as a `ggplot2` object called `sample_dendrogram`. This means that it can be displayed and modified similar to the other `ggplot2` objects.
+
+::: {.callout-note title="How to read the dendrogram"}
+- Each sample name at the bottom is the end of a branch
+- Samples that join at relatively low heights have more similar profiles
+- Samples or groups that join at higher heights are less similar
+- The vertical merge height represents distance under the selected linkage rule
+- Horizontal position is not a numerical measurement
+- Branches can be rotated without changing which samples are grouped together
+- A dendrogram describes relationships but does not prove that a branch is a distinct biological subtype
+:::
+
+::: {.callout-tip title="Try it yourself: Interpret the three different views of the samples"}
+
+Compare the Chapter 6 PCA and sample-distance heatmap with the new dendrogram.
+
+1. What are the main branches in the dendrogram?
+2. Do the branches broadly correspond to HAT and SERO TL+ status?
+3. What information is easiest to see in the distance heatmap?
+4. What information is easiest to see in the dendrogram?
+5. Why do the PCA and dendrogram not need to have identical visual arrangements?
+
+:::
+
+::: {.callout-tip title="Possible Solution" collapse="true"}
+
+1. Most samples form two broad branches
+
+The left-hand branch contains the HAT samples:
+
+
+- `h1.2`;
+
+- `h2.4`;
+
+- `h2.6`;
+
+- `h2.3`;
+
+- `h2.5`;
+
+- `h2.2`;
+
+- `h1.5`;
+
+- `h1.1`;
+
+- `h1.3`.
+
+The right-hand branch contains most of the SERO TL+ samples:
+
+
+- `shi.1`;
+
+- `slo.1`;
+
+- `slo.6`;
+
+- `slo.5`;
+
+- `slo.7`.
+
+`shi.2` is separated from both of these main branches. It joins all the remaining samples only at the highest merge height in the dendrogram.
+
+2. The two main branches broadly correspond to HAT and SERO TL+ status.
+
+The HAT samples occur together within one large branch, while most SERO TL+ samples occur together within another large branch. This is broadly consistent with the separation observed in the Chapter 6 PCA.
+
+However, `shi.2` is an exception to this broad pattern. It does not join the main SERO TL+ branch. Instead, `shi.2` joins the rest of the samples at a relatively high merge height of approximately 125.
+
+This shows that `shi.2` has a comparatively distinct expression profile under the transformation, distance and linkage methods used here. *It does not demonstrate that `shi.2` is incorrect or should be excluded*.
+
+3. The distance heatmap makes it easier to examine the relationship between each individual pair of samples.
+
+For example, the distance heatmap makes it easier to see:
+
+- which pair of samples has the smallest distance;
+- the relative distance between `shi.2` and every other sample;
+- whether a sample has consistently large distances from the other samples;
+- variation among samples within the same status group.
+
+The distance heatmap retains a separate value for every pairwise comparison.
+
+4. The dendrogram makes the nested grouping of samples easier to see.
+
+In particular, it shows:
+
+- which samples join first;
+- which small groups combine into larger branches;
+- the broad separation between the HAT and SERO TL+ samples;
+- smaller subgroups within the main branches;
+- that `shi.2` joins the remaining samples only at a relatively high merge height.
+
+The dendrogram summarises the distances as a hierarchy. It does not directly display every individual pairwise distance.
+
+6. The PCA and dendrogram summarise relationships among samples in different ways:
+
+The **PCA** represents major sources of variation using a small number of principal components. Samples that appear close together are similar with respect to the components displayed, but the plot does not display all the variation in the dataset.
+
+The **dendrogram** is constructed from pairwise distances and a selected linkage method. In this analysis, complete linkage uses the most distant pair of samples when comparing two groups. The left-to-right position of a sample in the dendrogram is also not a numerical measurement. Branches can be rotated without changing the clustering.
+
+We should therefore compare the broad relationships shown by the PCA and dendrogram rather than expecting the visual arrangements to match exactly.
+
+:::
+## Joining sample clustering to a gene-expression heatmap
+
+The sample dendrogram describes broad relationships among samples using all genes in `selected_vst`.
+
+We will now use the sample-clustering order to construct a targeted gene-expression heatmap. The heatmap will show how genes prioritised by the HAT-versus-SERO TL+ differential-expression analysis behave across individual samples.
+
+This changes the question:
+
+- the all-gene sample dendrogram asks about broad relationships among samples;
+- the targeted heatmap asks how prioritised genes vary across individual samples.
+
+In this chapter:
+
+- the **samples** will be ordered using hierarchical clustering;
+- the **genes** will remain ordered by adjusted p-value;
+- the gene labels will be hidden so that we can focus on broad expression patterns.
+
+We will cluster the genes and define gene-expression signatures in the next chapter.
+
+::: {.callout-warning title="Gene selection affects the question"}
+
+The heatmap genes are selected using the HAT-versus-SERO TL+ statistical comparison. Separation by status in the resulting heatmap is therefore expected and is not independent confirmation of the differential-expression result.
+
+The heatmap is useful for examining:
+
+- whether individual samples follow the broad pattern;
+- whether there is variation within the status groups;
+- whether the selected genes appear to contain one dominant response or several different patterns.
+
+It should not be presented as proof that the sample groups were discovered without using status information.
+
+:::
+
+## Select genes for the overview heatmap
+
+A heatmap containing every gene would be difficult to interpret. We will use the 150 genes with the smallest non-missing adjusted p-values.
+
+Using more genes gives us a broader view of the expression pattern. We will hide the individual gene labels because they would be too small to read.
+
+This reuses the filtering and ordering approach from Chapter 5.
+
+First, retain genes with a non-missing adjusted p-value:
+
+```{r}
+heatmap_candidates <- result_data[
+  !is.na(result_data$padj),
+]
+```
+
+Order the genes from the smallest to the largest adjusted p-value:
+
+```{r}
+heatmap_candidates <- heatmap_candidates[
+  order(heatmap_candidates$padj),
+]
+```
+
+Select up to 150 genes:
+
+```{r}
+number_overview_genes <- min(
+  150,
+  nrow(heatmap_candidates)
+)
+
+overview_genes <- head(
+  heatmap_candidates,
+  number_overview_genes
+)
+```
+
+Inspect the first few selected genes:
+
+```{r}
+head(
+  overview_genes[
+    ,
+    c(
+      "gene_id",
+      "symbol",
+      "log2FoldChange",
+      "padj"
+    )
+  ]
+)
+```
+
+The genes have been selected using a reproducible rule rather than chosen because they produce an interesting-looking heatmap.
+
+## Extract the expression values
+
+Use the stable gene identifiers to retrieve the corresponding rows from `selected_vst`:
+
+```{r}
+overview_matrix <- selected_vst[
+  overview_genes$gene_id,
+]
+```
+
+Check the dimensions:
+
+```{r}
+dim(overview_matrix)
+```
+
+The matrix should contain:
+
+- up to 150 genes in rows;
+- one column for every selected sample;
+- VST expression values in the cells.
+
+## Standardise expression within each gene
+
+Genes differ greatly in their overall expression. For this heatmap, we want the colours to show whether expression in a sample is relatively high or low **for that gene**.
+
+We therefore standardise each gene across the samples using a z-score:
+
+$$
+z = \frac{x - \bar{x}}{s}
+$$
+
+For each gene:
+
+- a z-score above 0 represents expression above that gene's mean;
+- a z-score below 0 represents expression below that gene's mean;
+- a z-score near 0 represents expression close to that gene's mean.
+
+The `scale()` function works down matrix columns. Our genes are stored in rows, so we:
+
+1. transpose the matrix to place genes in columns;
+2. apply `scale()`;
+3. transpose the matrix back to its original orientation.
+
+```{r}
+overview_z <- t(
+  scale(
+    t(overview_matrix)
+  )
+)
+```
+
+Check that the dimensions have not changed:
+
+```{r}
+dim(overview_z)
+```
+
+Inspect a small section:
+
+```{r}
+overview_z[1:5, 1:5]
+```
+
+::: {.callout-important title="Interpret the colours carefully"}
+
+A positive z-score does **not** mean that a gene is highly expressed compared with every other gene.
+
+It means that expression in that sample is above **that gene's own mean** across the selected samples.
+
+The heatmap colours should therefore be used to compare samples within a gene row, not to compare the absolute expression levels of different genes.
+
+:::
+
+::: {.callout-tip title="Check your understanding"}
+
+Decide whether each statement is true or false.
+
+1. Row standardisation changes the sample order.
+2. A z-score of 2 represents expression above that gene's own mean.
+3. A positive z-score proves that a gene has high absolute expression.
+4. Two genes can have different absolute expression levels but similar standardised patterns.
+
+:::
+
+::: {.callout-note title="Possible Solution" collapse="true"}
+
+1. **False.** Standardisation changes the expression values but does not itself change the order of the samples.
+
+2. **True.** A positive z-score represents expression above that gene's own mean across the selected samples.
+
+3. **False.** Row z-scores describe relative expression within a gene. They do not compare absolute abundance between different genes.
+
+4. **True.** Standardisation allows genes with different overall abundance levels to be compared by their patterns across samples.
+
+:::
+
+## Retrieve the sample-clustering order
+
+The `sample_hclust_all_genes` object created earlier records the order of the sample labels at the ends of the dendrogram.
+
+```{r}
+sample_order <- sample_hclust_all_genes$labels[
+  sample_hclust_all_genes$order
+]
+```
+
+Inspect the order:
+
+```{r}
+sample_order
+```
+
+Check that the clustering contains the same samples as the heatmap matrix:
+
+```{r}
+setequal(
+  sample_order,
+  colnames(overview_z)
+)
+```
+
+This should return `TRUE`.
+
+::: {.callout-note title="What determines each axis?"}
+
+The heatmap axes use two different ordering rules:
+
+- **samples** follow the hierarchical-clustering order;
+- **genes** remain in adjusted-p-value order.
+
+The gene rows are not clustered in this chapter. Gene clustering is introduced in the next chapter, where we will investigate whether the selected genes form reproducible expression signatures.
+
+:::
+
+## Reshape the matrix for ggplot2
+
+In Chapter 6, we converted a matrix into a data frame before constructing a heatmap with `ggplot2`.
+
+We will reuse the same approach here.
+
+The combination of `as.table()` and `as.data.frame()` converts the matrix into a data frame containing one row for every heatmap tile:
+
+```{r}
+overview_plot_data <- as.data.frame(
+  as.table(overview_z)
+)
+```
+
+Give the columns informative names:
+
+```{r}
+colnames(overview_plot_data) <- c(
+  "gene_id",
+  "sample_id",
+  "z_score"
+)
+```
+
+Inspect the result:
+
+```{r}
+head(overview_plot_data)
+```
+
+The data frame contains:
+
+- `gene_id`, identifying the heatmap row;
+- `sample_id`, identifying the heatmap column;
+- `z_score`, providing the colour of the tile.
+
+## Apply the sample and gene orders
+
+`ggplot2` uses factor levels to determine the order of discrete axes.
+
+Arrange the samples using the order from the sample dendrogram:
+
+```{r}
+overview_plot_data$sample_id <- factor(
+  overview_plot_data$sample_id,
+  levels = sample_order
+)
+```
+
+Keep the genes in adjusted-p-value order:
+
+```{r}
+overview_plot_data$gene_id <- factor(
+  overview_plot_data$gene_id,
+  levels = rev(
+    overview_genes$gene_id
+  )
+)
+```
+
+The genes were already ordered from the smallest to the largest adjusted p-value. The `rev()` function reverses the factor levels so that the gene with the smallest adjusted p-value appears at the top of the heatmap.
+
+::: {.callout-note title="Why use factors?"}
+
+The sample and gene identifiers are text values. If they remain as ordinary text, `ggplot2` may arrange them alphabetically.
+
+Factor levels allow us to supply the intended order:
+
+- dendrogram order for samples;
+- adjusted-p-value order for genes.
+
+:::
+
+## Add sample status to the labels
+
+The HAT and SERO TL+ labels were not used to construct the clustering, but we can add them afterwards to help interpret the heatmap.
+
+```{r}
+sample_labels <- paste0(
+  sample_order,
+  " [",
+  toupper(
+    as.character(
+      selected_info[
+        sample_order,
+        "status"
+      ]
+    )
+  ),
+  "]"
+)
+```
+
+Associate each displayed label with its sample identifier:
+
+```{r}
+names(sample_labels) <- sample_order
+```
+
+## Construct the overview heatmap
+
+We now reuse the heatmap structure introduced in Chapter 6:
+
+- samples are mapped to the x-axis;
+- genes are mapped to the y-axis;
+- row z-scores are mapped to the tile fill.
+
+We will hide the y-axis text because 150 individual gene labels would be too small to read.
+
+First, calculate a symmetrical colour limit:
+
+```{r}
+z_limit <- max(
+  abs(overview_plot_data$z_score),
+  na.rm = TRUE
+)
+```
+
+Using symmetrical limits ensures that positive and negative z-scores of the same magnitude receive equally strong colours.
+
+Construct the heatmap:
+
+```{r}
+# Order the samples using the dendrogram
+overview_plot_data$sample_id <- factor(
+  overview_plot_data$sample_id,
+  levels = sample_order
+)
+
+# Construct the heatmap
+overview_heatmap <- ggplot(
+  overview_plot_data,
+  aes(
+    x = sample_id,
+    y = gene_id,
+    fill = z_score
+  )
+) +
+  geom_tile() +
+  scale_fill_viridis_c() +
+  theme_minimal() +
+  theme(
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank()
+  )
+
+overview_heatmap
+```
+
+::: {.callout-important title="What has and has not been clustered?"}
+
+The **sample columns** follow the order obtained from hierarchical clustering using all VST-transformed genes.
+
+The **gene rows** have not been clustered. They remain ordered from the smallest to the largest adjusted p-value.
+
+The heatmap is therefore a **sample-ordered overview heatmap**, rather than a heatmap clustered on both axes.
+
+:::
+
+## Interpret the overview heatmap
+
+::: {.callout-important title="Partner interpretation task"}
+
+With a partner, discuss the following questions.
+
+1. What is the dominant expression pattern across the HAT and SERO TL+ samples?
+2. Do all selected genes show exactly the same pattern?
+3. Do all samples with the same status show identical expression values?
+4. How does `shi.2` behave for these selected genes compared with its position in the all-gene dendrogram?
+5. Are genes with similar patterns necessarily next to one another?
+6. What might gene clustering add in the next chapter?
+
+Use this structure:
+
+> The overview heatmap shows ______. Most HAT/SERO TL+ samples ______, although ______. The selected genes appear to show ______. Because the genes are ordered by adjusted p-value rather than expression pattern, ______.
+
+:::
+
+::: {.callout-note title="Possible Solution" collapse="true"}
+
+The overview heatmap shows a strong, broadly coordinated difference between the HAT and SERO TL+ samples.
+
+Many selected genes have expression above their gene-specific means in HAT samples and below their gene-specific means in SERO TL+ samples. This is consistent with a stronger coordinated immune or inflammatory response in symptomatic HAT.
+
+The genes do not all show identical patterns, and individual samples within each status group have different z-scores. This indicates variation in the strength or consistency of the response.
+
+Although `shi.2` was comparatively distinct in the all-gene dendrogram, it may still broadly follow the SERO TL+ pattern for these contrast-prioritised genes. This illustrates that sample relationships depend on the genes used to calculate them.
+
+The genes remain ordered by adjusted p-value. Genes with similar expression patterns are therefore not guaranteed to appear next to one another. Gene clustering in the next chapter may bring related patterns together and help determine whether the selected genes contain several signatures or one dominant response.
+
+The heatmap is not independent evidence of group separation because the genes were selected using the same HAT-versus-SERO TL+ comparison.
+
+:::
+
+## Save the overview heatmap
+
+Save the figure using the same `ggsave()` workflow used for previous `ggplot2` figures:
+
+```{r}
+ggsave(
+  filename = "results/figures/T09_expression_overview.png",
+  plot = overview_heatmap,
+  width = 11,
+  height = 9,
+  dpi = 300
+)
+```
+
+## Save the handover for the next chapter
+
+The next chapter will investigate whether genes with similar expression patterns can be organised into reproducible gene-expression signatures.
+
+The 150-gene overview matrix provides a broader input for pattern discovery than the smaller labelled heatmap.
+
+Save the row-standardised overview matrix, sample clustering, selected-gene table and metadata:
+
+```{r}
+clustering_heatmap_handover <- list(
+  heatmap_z = overview_z,
+  sample_hclust = sample_hclust_all_genes,
+  sample_annotation = selected_info,
+  heatmap_genes = overview_genes,
+  decisions = list(
+    gene_selection = paste(
+      "Up to 150 genes with the smallest",
+      "non-missing adjusted p-values"
+    ),
+    gene_order = "Adjusted p-value",
+    gene_scaling = "z-score within each gene",
+    sample_features = "All VST-transformed genes",
+    sample_distance = "Euclidean",
+    sample_linkage = "complete"
+  )
+)
+```
+
+Save the handover object:
+
+```{r}
+saveRDS(
+  clustering_heatmap_handover,
+  "results/objects/T09_clustering_heatmap_handover.rds"
+)
+```
+
+Save the selected-gene table:
+
+```{r}
+write.csv(
+  overview_genes[
+    ,
+    c(
+      "gene_id",
+      "symbol",
+      "log2FoldChange",
+      "padj"
+    )
+  ],
+  "results/tables/T09_heatmap_gene_list.csv",
+  row.names = FALSE
+)
+```
+
+Save the session information:
+
+```{r}
+writeLines(
+  capture.output(sessionInfo()),
+  "results/tables/T09_sessionInfo.txt"
+)
+```
+
+Check that the handover object was saved:
+
+```{r}
+file.exists(
+  "results/objects/T09_clustering_heatmap_handover.rds"
+)
+```
+
+This should return `TRUE`.
+
+## Preparing for the next chapter
+
+The genes in the overview heatmap remain ordered by adjusted p-value. Genes with similar expression patterns may therefore appear in different parts of the figure.
+
+In the next chapter, we will:
+
+- compare gene-expression patterns across samples
+- cluster genes using correlation-based distance
+- reorder the heatmap rows using the gene dendrogram
+- investigate whether the data contain one dominant response or several expression signatures
+- compare hierarchical tree cuts with k-means clustering
+- prepare gene lists for functional enrichment analysis
+
+
+
+## Optional challenge: Create a labelled heatmap
+
+::: {.callout-tip title="Extension: Create a labelled heatmap" collapse="true"}
+
+The overview heatmap is useful for seeing broad patterns, but it does not identify individual genes.
+
+In this extension, construct a second heatmap using 50 genes with readable symbols.
+
+This heatmap asks a more focused question:
+
+> Which individual genes contribute to the broad expression pattern?
+
+### Select 50 genes with readable symbols
+
+Reuse the Chapter 5 filtering approach:
+
+```{r}
+labelled_heatmap_genes <- result_data[
+  !is.na(result_data$padj) &
+    !is.na(result_data$symbol) &
+    result_data$symbol != "",
+]
+```
+
+Order the genes by adjusted p-value:
+
+```{r}
+labelled_heatmap_genes <- labelled_heatmap_genes[
+  order(labelled_heatmap_genes$padj),
+]
+```
+
+Select the first 50 genes:
+
+```{r}
+labelled_heatmap_genes <- head(
+  labelled_heatmap_genes,
+  50
+)
+```
+
+More than one stable gene identifier can occasionally share the same gene symbol. Create unique display labels:
+
+```{r}
+labelled_heatmap_genes$display_symbol <- make.unique(
+  labelled_heatmap_genes$symbol
+)
+```
+
+### Extract and standardise the expression values
+
+```{r}
+labelled_matrix <- selected_vst[
+  labelled_heatmap_genes$gene_id,
+]
+
+labelled_z <- t(
+  scale(
+    t(labelled_matrix)
+  )
+)
+```
+
+### Reshape the matrix
+
+```{r}
+labelled_plot_data <- as.data.frame(
+  as.table(labelled_z)
+)
+
+colnames(labelled_plot_data) <- c(
+  "gene_id",
+  "sample_id",
+  "z_score"
+)
+```
+
+### Replace stable identifiers with readable symbols
+
+Use `match()` to associate each stable identifier with its display symbol:
+
+```{r}
+labelled_plot_data$gene_symbol <-
+  labelled_heatmap_genes$display_symbol[
+    match(
+      labelled_plot_data$gene_id,
+      labelled_heatmap_genes$gene_id
+    )
+  ]
+```
+
+Check that every gene has a label:
+
+```{r}
+sum(
+  is.na(labelled_plot_data$gene_symbol)
+)
+```
+
+This should return `0`.
+
+### Apply the orders
+
+Order the samples using the same sample dendrogram:
+
+```{r}
+labelled_plot_data$sample_id <- factor(
+  labelled_plot_data$sample_id,
+  levels = sample_order
+)
+```
+
+Keep the genes in adjusted-p-value order:
+
+```{r}
+labelled_plot_data$gene_symbol <- factor(
+  labelled_plot_data$gene_symbol,
+  levels = rev(
+    labelled_heatmap_genes$display_symbol
+  )
+)
+```
+
+### Construct the labelled heatmap
+
+Calculate symmetrical colour limits:
+
+```{r}
+labelled_z_limit <- max(
+  abs(labelled_plot_data$z_score),
+  na.rm = TRUE
+)
+```
+
+Construct the heatmap:
+
+```{r}
+#| label: fig-labelled-expression-heatmap
+#| fig-width: 11
+#| fig-height: 10
+
+labelled_heatmap <- ggplot(
+  labelled_plot_data,
+  aes(
+    x = sample_id,
+    y = gene_symbol,
+    fill = z_score
+  )
+) +
+  geom_tile() +
+  scale_x_discrete(
+    labels = sample_labels
+  ) +
+  scale_fill_gradient2(
+    low = "#2166AC",
+    mid = "white",
+    high = "#B2182B",
+    midpoint = 0,
+    limits = c(
+      -labelled_z_limit,
+      labelled_z_limit
+    ),
+    name = "Row z-score"
+  ) +
+  labs(
+    title = "Expression patterns among selected genes",
+    subtitle = paste(
+      "50 genes ordered by adjusted p-value;",
+      "samples ordered by hierarchical clustering"
+    ),
+    x = "Sample and status",
+    y = "Gene",
+    caption = paste(
+      "Colours show expression relative to each gene's mean.",
+      "Gene symbols are shown for the 50 prioritised genes."
+    )
+  ) +
+  theme_minimal() +
+  theme(
+    panel.grid = element_blank(),
+    axis.text.x = element_text(
+      angle = 45,
+      hjust = 1
+    ),
+    axis.text.y = element_text(
+      size = 7
+    ),
+    plot.caption = element_text(
+      hjust = 0
+    )
+  )
+
+labelled_heatmap
+```
+
+### Compare the two heatmaps
+
+Discuss:
+
+1. Which broad patterns are easier to see in the 150-gene overview?
+2. Which details are easier to investigate in the labelled heatmap?
+3. Does reducing the number of genes change the apparent sample pattern?
+4. What is gained and lost when gene labels are displayed?
+5. Why might gene clustering improve either heatmap?
+
+Save the optional figure if required:
+
+```{r}
+ggsave(
+  filename = "results/figures/T09_labelled_heatmap.png",
+  plot = labelled_heatmap,
+  width = 11,
+  height = 10,
+  dpi = 300
+)
+```
+
+:::

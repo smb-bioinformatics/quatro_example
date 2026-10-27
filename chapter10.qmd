@@ -1,0 +1,463 @@
+# Assessment Workshop and R Catch-up
+
+## What you'll learn
+
+In this tutorial, you'll consolidate your learning with a light workshop session, check that your assessment workflow is reproducible and address any lingering questions about R basics.
+
+::: {.callout-note title="Learning outcomes"}
+By the end of this chapter you should be able to:
+
+- explain why reproducibility matters in bioinformatics
+- use comments to document the purpose of code and important analysis decisions
+- rerun a workflow from a clean R session
+- identify the inputs, parameters, outputs, and software versions behind a result
+- explain how Git and GitHub can support a reproducible analysis
+- identify information that should not be uploaded to a public repository
+- diagnose a common R error from its message and the structure of the relevant object
+- audit a draft piece of work for reproducibility and clear communication
+
+**ISCB alignment:** E3 (document analytical decisions, record software
+versions, organise project outputs and manage code and data responsibly),
+F3 (use Git, GitHub and `.gitignore` appropriately to support reproducible
+bioinformatics workflows), H3 (review core R operations and diagnose common
+coding and object-structure errors), I3 (apply responsible data-sharing,
+privacy and research-ethics principles to patient-derived data), K3
+(communicate analysis decisions clearly through comments, README files,
+figure documentation and peer review).
+:::
+
+## Why reproducibility matters
+
+Imagine that you complete your assessment today and revisit it several months later. Would you be able to run the analysis again and obtain the same results?
+
+A reproducible analysis allows another person, or your future self, to:
+
+- identify the original data used
+- understand each analysis step
+- follow the reasoning behind important decisions
+- run the code successfully
+- generate the same outputs
+
+In bioinformatics, reproducibility is especially important because analyses often involve multiple files, software packages, parameters, and processing steps.
+
+Good reproducibility habits include:
+
+- keeping project files organised
+- writing clear code that runs in a logical order
+- adding useful comments
+- recording important analysis decisions and settings
+- recording software and package versions
+- sharing code and data responsibly
+
+::: {.callout-tip title="A useful question"}
+For each result in your assessment, ask:
+
+> Could another student understand how I produced this result without me explaining it to them?
+:::
+
+## Commenting and documenting code
+
+You may have noticed that some lines in R code begin with a hash symbol, `#`. These lines are called **comments**.
+
+R ignores everything after `#` on that line. Comments are written for people reading the code and are not treated as instructions for R.
+
+Comments can help us:
+
+- explain the purpose of a section of code
+- record why an analytic decision was made
+- make a script easier to navigate
+- help someone else understand and reuse our analysis
+- remind our future selves what the code was intended to do
+
+A useful comment normally explains **why** a function is being run or what a group of statements is intended to achieve. It should not simply repeat something that is already obvious from the code.
+
+For example, this comment is not especially helpful:
+
+```r
+# Use dim on count_data
+dim(count_data)
+```
+
+This version better explains the purpose of the statement at this point in the script:
+
+```r
+# Confirm the number of imported genes (rows) and samples (columns)
+dim(count_data)
+```
+
+Comments can also record an important analysis decision:
+
+```r
+# Remove genes with fewer than 10 counts across all samples
+# to reduce noise from very low-count genes.
+count_data <- count_data[rowSums(count_data) >= 10, ]
+```
+
+The comment explains the purpose of the filtering step and records the threshold that was used.
+
+Comments should be useful but concise. Too many comments can make a script harder to read, particularly when every simple function has a comment that merely repeats the code.
+
+::: {.callout-tip title="Quick check"}
+Which comment would be more useful to someone reviewing your project several months later?
+
+```r
+# Make volcano plot
+ggplot(...)
+```
+
+or
+
+```r
+# Visualise differential expression results and highlight genes
+# meeting the significance threshold used in the report.
+ggplot(...)
+```
+
+The second comment is more useful because it describes the purpose of the figure rather than simply naming the type of plot.
+:::
+
+### Use headings to organise a script
+
+Comments can also divide a longer script into sections. RStudio recognises section headings written in this form:
+
+```r
+# Import data -------------------------------------------------------------
+
+# Check sample identifiers ------------------------------------------------
+
+# Filter low-count genes --------------------------------------------------
+
+# Differential expression analysis ---------------------------------------
+
+# Create figures ----------------------------------------------------------
+
+# Save outputs ------------------------------------------------------------
+```
+
+This makes the script easier to scan and provides navigation in RStudio's document outline.
+
+### Record decisions, not just commands
+
+Some information cannot be reconstructed from the code alone. Record decisions such as:
+
+- why a filtering threshold was chosen
+- why a sample was excluded
+- which group was used as the reference level
+- which statistical test or model was selected
+- whether default settings were changed
+- where the original data came from
+
+These details may be recorded in comments, the assessment report, or a short `README.md` file.
+
+A useful `README.md` might state:
+
+- the purpose of the project
+- where the data came from
+- the order in which scripts should be run
+- which outputs the scripts create
+- any important assumptions or decisions
+
+::: {.callout-important title="Mini audit: improve one comment"}
+Find one comment in your assessment code that only repeats the command below it. Rewrite the comment so that it explains the **purpose** of the step or the **reason** for the decision.
+
+If the code is already self-explanatory and no explanation is needed, consider removing the comment instead.
+:::
+
+## Recording your session information
+
+Good scientific practice means recording which software versions produced your results. R and its packages are updated over time, and changes between versions can affect how code behaves.
+
+The following code saves the details of your current R session in the project rather than only printing them to the Console:
+
+```{r}
+# Create the output folders if they do not already exist.
+dir.create("results", showWarnings = FALSE)
+dir.create(
+  file.path("results", "tables"),
+  recursive = TRUE,
+  showWarnings = FALSE
+)
+
+# Record the R, operating-system, and loaded-package versions used.
+writeLines("tables/sessionInfo.txt")
+```
+
+Open `tables/sessionInfo.txt` and inspect its contents. It records your R version, operating system, and the version of every package loaded in the current session.
+
+::: {.callout-note title="What else should be recorded?"}
+Software versions are only one part of reproducibility. You should also be able to identify:
+
+- **inputs:** the files or objects used
+- **parameters:** thresholds, factor levels, and non-default settings
+- **processing:** the steps applied and their order
+- **outputs:** the files, tables, and figures produced
+- **decisions:** exclusions, transformations, and analytical choices
+:::
+
+::: {.callout-important title="Reproducibility check"}
+Restart R in RStudio using **Session > Restart R**, and then run your script from the beginning, in order, with no earlier objects left in the Environment pane.
+
+A reproducible workflow must not silently depend on objects created in an earlier session. If something fails, that is useful information. It means a later step depends on something that has not been created or loaded by the script.
+:::
+
+## Sharing projects responsibly with GitHub
+
+**Git** is a version-control system that records changes to files. **GitHub** is an online service that can store Git repositories and support sharing and collaboration.
+
+For this session, the aim is not to learn every Git feature. The focus is on three practical ideas:
+
+1. keeping a history of changes to analysis code
+2. sharing code and documentation
+3. preventing sensitive data from being added to a repository
+
+A bioinformatics repository might contain:
+
+- R scripts
+- Quarto or R Markdown files
+- a `README.md` file
+- small, non-sensitive example data where sharing is permitted
+- figures or tables, where appropriate
+
+A public repository should not contain:
+
+- identifiable or confidential patient data
+- files that you do not have permission to share
+- passwords, access tokens, or other credentials
+- assessment material that should not be made public
+
+::: {.callout-warning title="Data protection and research ethics"}
+The sample data used in this activity are derived from patients. Do not upload the sample data to GitHub.
+
+Whether research data can be shared depends on matters such as consent, identifiability, ethical approval, data-sharing agreements, and University policy. A file being technically easy to upload does not mean that uploading it is permitted.
+
+Consult the University of Glasgow guidance when working with research data:
+
+- [Data protection and freedom of information guidance for staff and students](https://www.gla.ac.uk/myglasgow/dpfoioffice/guidanceforstaffandstudents/){target="_blank" rel="noopener noreferrer"}
+- [Research ethics policy and guidance](https://www.gla.ac.uk/research/strategy/ourpolicies/ethics/){target="_blank" rel="noopener noreferrer"}
+:::
+
+### Use `.gitignore` to exclude files
+
+A `.gitignore` file tells Git which files and folders it should not track. You will be provided with a `.gitignore` file for the course project.
+
+It will include rules similar to these:
+
+```text
+# Do not track the folder containing patient-derived sample data.
+data/
+
+# Do not track common R workspace files.
+.Rhistory
+.RData
+
+# Do not track operating-system files.
+.DS_Store
+Thumbs.db
+```
+
+The `data/` rule prevents files inside that folder from being added to Git. The other rules exclude local files that are not needed to reproduce the analysis.
+
+::: {.callout-important title="Important limitation"}
+A `.gitignore` file helps prevent files from being added accidentally, but it is not a security system.
+
+If sensitive data have already been committed, adding the file to `.gitignore` does not remove the data from the repository's earlier history. Check what will be committed before publishing or sharing a repository.
+:::
+
+::: {.callout-tip title="Discussion: what should be shared?"}
+For each item below, discuss whether it would normally be appropriate to upload it to a **public** GitHub repository:
+
+- analysis scripts
+- Quarto files
+- a README file
+- processed summary figures
+- raw patient data
+- metadata containing personal identifiers
+- a password or access token used by a script
+
+What additional information would you need before deciding? There may not be one answer that applies to every project.
+:::
+
+### Install GitHub Desktop
+
+[GitHub Desktop](https://desktop.github.com/){target="_blank" rel="noopener noreferrer"} provides a graphical interface for Git and is available for Windows and macOS.
+
+1. Download and install GitHub Desktop.
+2. Open it and sign in with your GitHub account, or create an account if required.
+3. Clone the course repository using the URL provided by your instructor.
+4. Choose a suitable location for the repository on your computer.
+5. Open the repository folder and identify the analysis files, `data/` folder, and `results/` folder.
+6. In GitHub Desktop, inspect the repository and confirm that the patient-derived files inside `data/` are not listed as changes to be committed.
+
+::: {.callout-note title="Git, GitHub, and GitHub Desktop"}
+- **Git** tracks changes to files on your computer.
+- **GitHub** can store and share a copy of a Git repository online.
+- **GitHub Desktop** provides buttons and menus for common Git operations.
+
+You can use Git without GitHub, and you can interact with GitHub without using the command line.
+:::
+
+### Make one small, meaningful commit
+
+Make a small improvement to a comment or to the project README. In GitHub Desktop:
+
+1. inspect the changed file before committing it
+2. confirm that no data files are included
+3. write a short commit summary describing the change, for example, `Clarify count filtering decision`
+4. commit the change to the repository
+
+A commit records a meaningful point in the history of the project. Short, specific commit messages are more useful than messages such as `changes` or `update`.
+
+## R catch-up: quick review
+
+Before moving on to more advanced topics, let's make sure some R fundamentals from earlier chapters have properly stuck.
+
+::: {.callout-tip title="Try it yourself: quick review"}
+Without looking back at earlier chapters, answer these from memory, then check your answers against your own earlier code:
+
+1. What is the difference between `count_data[1, ]` and `count_data[, 1]`?
+2. Why do we convert `sample_info$status` to a factor before analysis and plotting?
+3. What does `match(x, table)` return?
+4. In a `ggplot2` call, what is the difference between putting `colour = status` inside `aes()` and writing `colour = "blue"` outside `aes()`?
+5. Why do we always check that metadata and count-matrix samples are aligned before running a statistical test?
+
+::: {.callout-tip collapse="true" title="Solution"}
+1. `count_data[1, ]` extracts the first **row**: one gene and all samples. `count_data[, 1]` extracts the first **column**: one sample and all genes.
+2. Converting `status` to a factor with an explicit level order controls the ordering of groups in tables, legends, plots, and statistical models. It can also define the reference group used by a model.
+3. `match(x, table)` returns, for each element of `x`, the position of its first match in `table`, or `NA` if no match is found.
+4. Inside `aes()`, `colour = status` maps the `status` column to colour and creates a legend. Outside `aes()`, `colour = "blue"` applies one fixed colour to every point and does not create a mapping.
+5. DESeq2, PCA, clustering, and plots assume that row *i* of the metadata and column *i* of the count matrix describe the same sample. A mismatch could produce technically valid output that describes the wrong biology.
+:::
+:::
+
+## Common errors and how to read them
+
+::: {.callout-tip title="Troubleshooting"}
+**`object 'x' not found`**  
+You tried to use an object before creating it, or you ran chunks out of order. Rerun the script from the top and locate where the object should first be created.
+
+**`non-numeric argument to binary operator`**  
+You tried to perform arithmetic on something that is not numeric. Inspect the object with `class()`, `str()`, or `glimpse()` before changing it.
+
+**`replacement has X rows, data has Y`**  
+You tried to insert a vector of the wrong length into a data-frame column. Check that the right-hand side contains one value per row.
+
+**A plot is blank or contains no points**  
+Check that the columns mapped inside `aes()` exist and contain the expected values. Inspect the data supplied to `ggplot()` using `head()`, `str()`, or `summary()`.
+
+**DESeq2 reports a problem with the design formula**  
+Check that the variable named in `design = ~ status` exists in `colData(dds)`, is encoded appropriately, and contains the groups and replication expected for the analysis.
+:::
+
+::: {.callout-note title="A structured troubleshooting habit"}
+When an error occurs:
+
+1. read the complete error message
+2. identify the line or chunk that failed
+3. inspect the objects used on that line
+4. check their names, classes, dimensions, and contents
+5. make one change at a time, then rerun the relevant code
+
+Do not repeatedly rerun the same command without investigating what the message is telling you.
+:::
+
+## Peer review
+
+::: {.callout-important title="Peer review"}
+Exchange one figure and its associated code with a partner. Without you explaining it verbally, can they identify:
+
+- the input data and any filtering applied
+- the transformation used, such as raw, normalised, or VST
+- the groups being compared
+- any significance thresholds
+- the conclusion supported by the figure
+- the code and package used to create it
+- any settings or decisions that would be needed to reproduce it
+
+Then inspect the code itself. Are the comments useful and concise? Can your partner distinguish what the code does from why important decisions were made?
+
+If something is unclear, add the missing information to the code, caption, or README. The aim is clearer communication, not extra decoration.
+:::
+
+## Optional challenge: Git from the command line
+
+This activity introduces the commands behind the actions performed by GitHub Desktop. It is optional and does not require you to publish anything to GitHub.
+
+Open a terminal in the course project folder. On Windows, you can use **Git Bash**, which is installed with Git for Windows. On macOS, you can use **Terminal**.
+
+First, check whether the folder is already a Git repository:
+
+```bash
+git status
+```
+
+If you are working in a new practice folder rather than the cloned course repository, initialise it:
+
+```bash
+git init
+```
+
+Inspect the current status:
+
+```bash
+git status
+```
+
+Add one non-sensitive analysis or documentation file to the staging area:
+
+```bash
+git add analysis.R
+```
+
+Check the status again:
+
+```bash
+git status
+```
+
+Create a commit:
+
+```bash
+git commit -m "Add initial analysis script"
+```
+
+Inspect the short commit history:
+
+```bash
+git log --oneline
+```
+
+To check whether a path is excluded by `.gitignore`, use:
+
+```bash
+git check-ignore -v data/example_counts.csv
+```
+
+::: {.callout-warning title="Do not force-add the data"}
+Do not use `git add -f` to override the `.gitignore` rules for patient-derived data. The purpose of this exercise is to see how Git prevents those files from entering the repository.
+:::
+
+::: {.callout-tip title="Optional challenge questions"}
+1. What changed in the output of `git status` after `git add analysis.R`?
+2. What information was recorded by the commit?
+3. Which `.gitignore` rule applies to the example data file?
+4. How do GitHub Desktop's **Changes**, **Summary**, and **Commit** controls correspond to the commands you used?
+:::
+
+You are not expected to become a Git expert during this course. The goal is to recognise the basic workflow and understand how version control can support reproducible research.
+
+## Summary
+
+You have now:
+
+- considered what another person needs in order to reproduce an analysis
+- practised writing comments that explain purpose and decisions
+- identified information that belongs in comments or a README
+- recorded your R session information
+- rerun your analysis from a clean session to check for hidden dependencies
+- considered what should and should not be shared in a public repository
+- used `.gitignore` to exclude patient-derived sample data
+- made a small commit using GitHub Desktop
+- revisited core R concepts and common errors
+- reviewed a piece of work for reproducibility and clear communication
+
+In the next chapter, we return to the analysis and look for patterns *among genes* using clustering.

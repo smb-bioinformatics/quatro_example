@@ -1,0 +1,444 @@
+# Identifying and Adjusting for Confounding Variables
+
+## What you'll learn
+
+Every earlier chapter used `m_sample_counts.csv` and `m_sample_info.csv` — a version of the dataset  filtered down to male samples only. In this tutorial you'll load the **complete** dataset (both sexes, every sample) and see what that filtering was hiding: biological sex turns out to be a major, unmodelled source of variation. You'll then correct the statistical model to account for it, and remake the earlier tutorials' key plots using the complete, corrected data.
+
+::: {.callout-note}
+## Learning outcomes
+By the end of this chapter you should be able to:
+
+- explain why an unmodelled biological covariate can distort a PCA plot
+- read a PCA plot for evidence of confounding between two variables
+- add a covariate to a DESeq2 design formula and explain what changes
+- distinguish adjusting for a covariate in the model from removing it from the data before testing, and explain why only the former is appropriate before a statistical test
+
+**ISCB alignment:** B3, C3, D3, F3 and K3, at application/analysis level.
+:::
+
+::: {.callout-tip title="Recap: code so far" collapse="true"}
+```{r}
+#| message: false
+dir.create("results", showWarnings = FALSE)
+dir.create(file.path("results", "tables"), recursive = TRUE, showWarnings = FALSE)
+dir.create(file.path("results", "figures"), recursive = TRUE, showWarnings = FALSE)
+
+
+library(DESeq2); library(ggplot2); library(pheatmap)
+
+annotation_file <- read.csv("human_annotations_from_orgHs.csv", check.names = FALSE, stringsAsFactors = FALSE)
+
+GROUP_COLOURS <- c(
+  ctrl = "#4D4D4D", sero = "#1B9E77", hat = "#D95F02"
+)
+course_theme <- theme_classic(base_size = 12) +
+  theme(plot.title = element_text(face = "bold", size = 14), axis.title = element_text(face = "bold"),
+        axis.text = element_text(size = 11))
+```
+:::
+
+## Loading the complete dataset
+
+```{r}
+full_count_data <- as.matrix(read.csv("all_sample_counts_complete.csv", header = TRUE, row.names = 1, check.names = FALSE))
+full_sample_info <- read.csv("all_sample_info_complete.csv", header = TRUE, row.names = 1, check.names = FALSE)
+full_sample_info <- full_sample_info[colnames(full_count_data), , drop = FALSE]
+full_sample_info$status <- factor(full_sample_info$status)
+full_sample_info$sex <- factor(full_sample_info$sex, levels = c("f", "m"))
+
+table(full_sample_info$status, full_sample_info$sex)
+```
+
+```{r}
+SEX_COLOURS <- c(f = "#D01C8B", m = "#4DAC26")
+```
+
+::: {.callout-tip title="Before you run: predict the imbalance"}
+Look at the table above. Is sex balanced within every status group, or is one group mostly a single sex? Keep this pattern in mind for the rest of the tutorial — it explains some odd-looking results later on.
+
+::: {.callout-tip title="Solution" collapse="true"}
+Control and SERO are reasonably balanced (4 female, 6 male each), but HAT is nine males and one female. That imbalance means sex and status are partly **confounded** in this dataset: some of what looks like a "HAT effect" could really be (at least in part) a sex effect, and there's no way to fully untangle the two from a single female HAT sample alone.
+:::
+:::
+
+## Section A: A model that ignores sex
+
+```{r}
+dds_naive <- DESeqDataSetFromMatrix(countData = full_count_data, colData = full_sample_info, design = ~ status)
+dds_naive <- dds_naive[rowSums(counts(dds_naive)) >= 10, ]
+dds_naive <- DESeq(dds_naive)
+
+vsd_full <- vst(dds_naive, blind = FALSE)
+vst_full <- assay(vsd_full)
+```
+
+::: {.callout-important}
+## Check your understanding
+`design = ~ status` treats sex as unexplained noise, exactly like every variable not named in the formula. Why might that noise not be "random" if the groups are unevenly balanced by sex?
+
+::: {.callout-tip title="Solution" collapse="true"}
+If sex affected expression **and** happened to be unevenly distributed across status groups, that sex-driven variation would land unevenly across groups too — some of it would look exactly like a status effect, purely by coincidence of who happened to be sampled. "Noise" is only safe to ignore when it is unrelated to the groups you are comparing.
+:::
+:::
+
+### PCA across all three groups and both sexes
+
+```{r}
+n_top_pca_genes_full <- min(500, nrow(vst_full))
+pca_gene_variance_full <- apply(vst_full, 1, var)
+top_pca_gene_ids_full <- names(sort(pca_gene_variance_full, decreasing = TRUE))[1:n_top_pca_genes_full]
+pca_input_full <- vst_full[top_pca_gene_ids_full, , drop = FALSE]
+
+pca_fit_full <- prcomp(t(pca_input_full), center = TRUE, scale. = FALSE)
+pca_variance_full <- 100 * pca_fit_full$sdev^2 / sum(pca_fit_full$sdev^2)
+round(pca_variance_full[1:3], 1)
+```
+
+```{r}
+pca_data_full <- as.data.frame(pca_fit_full$x[, 1:2])
+pca_data_full$sample_id <- rownames(pca_data_full)
+pca_data_full$status <- full_sample_info[pca_data_full$sample_id, "status"]
+pca_data_full$sex <- full_sample_info[pca_data_full$sample_id, "sex"]
+
+pca_plot_full_status <- ggplot(pca_data_full, aes(PC1, PC2, colour = status)) +
+  geom_point(size = 3) +
+  scale_colour_manual(values = GROUP_COLOURS) +
+  labs(
+    title = "PCA of all samples, coloured by treatment group",
+    x = sprintf("PC1 (%.1f%% variance)", pca_variance_full[1]),
+    y = sprintf("PC2 (%.1f%% variance)", pca_variance_full[2]),
+    colour = "Treatment group"
+  ) +
+  course_theme
+
+ggsave(file.path("results", "figures", "T13_PCA_full_by_status.png"), pca_plot_full_status, width = 6.5, height = 5, dpi = 300)
+pca_plot_full_status
+```
+
+```{r}
+pca_plot_full_sex <- ggplot(pca_data_full, aes(PC1, PC2, colour = sex)) +
+  geom_point(size = 3) +
+  scale_colour_manual(values = SEX_COLOURS) +
+  labs(
+    title = "PCA of all samples, coloured by sex",
+    x = sprintf("PC1 (%.1f%% variance)", pca_variance_full[1]),
+    y = sprintf("PC2 (%.1f%% variance)", pca_variance_full[2]),
+    colour = "Sex"
+  ) +
+  course_theme
+
+ggsave(file.path("results", "figures", "T13_PCA_full_by_sex.png"), pca_plot_full_sex, width = 6.5, height = 5, dpi = 300)
+pca_plot_full_sex
+```
+
+::: {.callout-note title="Interpretation checkpoint"}
+Compare the two colourings of the same PCA coordinates:
+
+- PC1 tracks sex most strongly, with females and males separating clearly.
+- PC2 carries more of the remaining status-related signal, though HAT also separates somewhat on PC1.
+- Look back at the status-by-sex table: HAT is nine males and one female. Because sex and status are unevenly distributed together, some of what looks like a "status" pattern on PC1 may really be a sex pattern in disguise — this is what a confounded, unbalanced design looks like.
+
+A PCA plot describes structure; it does not tell you which variable *causes* that structure, or whether two variables are tangled together.
+:::
+
+::: {.callout-tip title="Try it yourself"}
+Recolour `pca_data_full` by an interaction of status and sex (`interaction(pca_data_full$status, pca_data_full$sex)`) to see all six status-by-sex groups at once. Does this make the sex/status tangle in HAT easier or harder to see than the two separate plots above?
+:::
+
+## Section B: Correcting the model for sex
+
+```{r}
+dds_corrected <- DESeqDataSetFromMatrix(countData = full_count_data, colData = full_sample_info, design = ~ sex + status)
+dds_corrected <- dds_corrected[rowSums(counts(dds_corrected)) >= 10, ]
+dds_corrected <- DESeq(dds_corrected)
+
+res_hat_vs_sero_full <- results(dds_corrected, contrast = c("status", "hat", "sero"), alpha = 0.05)
+sum(res_hat_vs_sero_full$padj < 0.05, na.rm = TRUE)
+```
+
+::: {.callout-note title="Analytical choice"}
+`design = ~ sex + status` asks DESeq2 to estimate an average sex effect and an average status effect at the same time, then test the status effect *after* accounting for sex. This does not change what "status" means, but it stops sex-driven variation from being wrongly counted as unexplained noise. It only works well when every status group contains both sexes (true here, even though HAT is mostly male) — a status group that was 100% one sex would make it impossible to separate sex from status at all, no matter how the model is written.
+:::
+
+::: {.callout-important}
+## Check your understanding
+Compare the significant-gene count above with Chapter 4's HAT-vs-SERO count from the male-only dataset. More samples and a better-specified model usually increase statistical power — but does a bigger number alone *prove* the corrected result is more biologically correct?
+
+::: {.callout-tip title="Solution" collapse="true"}
+No. A larger significant-gene count shows the test has more statistical power given this design and data — it does not, by itself, prove biological correctness. It's still worth checking that the newly significant genes make biological sense, and remembering that "more significant" is not automatically "more true".
+:::
+:::
+
+```{r}
+vsd_corrected <- vst(dds_corrected, blind = FALSE)
+vst_corrected <- assay(vsd_corrected)
+
+gene_annotation_full <- data.frame(gene_id = rownames(dds_corrected), stringsAsFactors = FALSE)
+gene_annotation_full$symbol <- annotation_file$SYMBOL_SAFE[match(gene_annotation_full$gene_id, annotation_file$ENSEMBL)]
+missing_symbol_full <- is.na(gene_annotation_full$symbol) | gene_annotation_full$symbol == ""
+gene_annotation_full$symbol[missing_symbol_full] <- gene_annotation_full$gene_id[missing_symbol_full]
+
+result_data_full <- as.data.frame(res_hat_vs_sero_full)
+res_hat_vs_sero_full_table <- data.frame(
+  gene_id = rownames(result_data_full),
+  symbol = gene_annotation_full$symbol[match(rownames(result_data_full), gene_annotation_full$gene_id)],
+  result_data_full, row.names = NULL, check.names = FALSE, stringsAsFactors = FALSE
+)
+res_hat_vs_sero_full_table <- res_hat_vs_sero_full_table[order(res_hat_vs_sero_full_table$padj, na.last = TRUE), ]
+
+write.csv(res_hat_vs_sero_full_table, file.path("results", "tables", "T13_DE_hat_vs_sero_sex_corrected.csv"), row.names = FALSE)
+```
+
+### Remaking the earlier plots with the complete, corrected data
+
+```{r}
+selected_samples_full <- colnames(vst_corrected)[full_sample_info[colnames(vst_corrected), "status"] %in% c("sero", "hat")]
+selected_vst_full <- vst_corrected[, selected_samples_full]
+
+plot_de_full <- res_hat_vs_sero_full_table
+plot_de_full$minus_log10_padj <- -log10(plot_de_full$padj)
+plot_de_full$direction <- "Not significant"
+plot_de_full$direction[!is.na(plot_de_full$padj) & plot_de_full$padj < 0.05 & plot_de_full$log2FoldChange > 1] <- "Higher in HAT"
+plot_de_full$direction[!is.na(plot_de_full$padj) & plot_de_full$padj < 0.05 & plot_de_full$log2FoldChange < -1] <- "Higher in SERO TL+"
+```
+
+Volcano plot (compare with Chapter 6's male-only version):
+
+```{r}
+volcano_plot_full <- ggplot(
+  plot_de_full,
+  aes(x = log2FoldChange, y = minus_log10_padj, colour = direction)
+) +
+  geom_point(alpha = 0.6, size = 1.3, na.rm = TRUE) +
+  geom_vline(xintercept = c(-1, 1), linetype = "dashed", colour = "grey50") +
+  geom_hline(yintercept = -log10(0.05), linetype = "dashed", colour = "grey50") +
+  scale_colour_manual(values = c(
+    "Higher in SERO TL+" = "#B2182B",
+    "Higher in HAT" = "#2166AC",
+    "Not significant" = "grey70"
+  )) +
+  labs(
+    title = "Volcano plot (sex-corrected): HAT versus SERO TL+",
+    x = "log2 fold change (HAT vs SERO)",
+    y = "-log10 adjusted p-value",
+    colour = "Expression direction"
+  ) +
+  theme_classic()
+
+ggsave(file.path("results", "figures", "T13_volcano_hat_vs_sero_corrected.png"), volcano_plot_full, width = 7, height = 5, dpi = 300)
+volcano_plot_full
+```
+
+MA plot:
+
+```{r}
+png(file.path("results", "figures", "T13_MA_hat_vs_sero_corrected.png"), width = 1600, height = 1200, res = 200)
+plotMA(res_hat_vs_sero_full, alpha = 0.05, main = "MA plot (sex-corrected): HAT versus SERO TL+")
+dev.off()
+```
+
+```{r}
+#| echo: false
+plotMA(res_hat_vs_sero_full, alpha = 0.05, main = "MA plot (sex-corrected): HAT versus SERO TL+")
+```
+
+Sample-distance heatmap, now annotated by both status and sex:
+
+```{r}
+sample_dist_full <- as.matrix(dist(t(selected_vst_full)))
+sample_annotation_full <- data.frame(
+  status = full_sample_info[colnames(selected_vst_full), "status"],
+  sex = full_sample_info[colnames(selected_vst_full), "sex"]
+)
+rownames(sample_annotation_full) <- colnames(selected_vst_full)
+```
+
+::: {.callout-tip title="Click to reveal: what the heatmap should look like" collapse="true"}
+```{r}
+#| echo: false
+pheatmap(sample_dist_full, annotation_col = sample_annotation_full, annotation_row = sample_annotation_full)
+```
+:::
+
+Single top-gene plot, now with sex shown as point shape:
+
+```{r}
+top_gene_id_full <- plot_de_full$gene_id[order(plot_de_full$padj, na.last = NA)[1]]
+top_gene_symbol_full <- gene_annotation_full$symbol[match(top_gene_id_full, gene_annotation_full$gene_id)]
+
+top_gene_data_full <- data.frame(
+  sample_id = colnames(selected_vst_full),
+  expression = as.numeric(selected_vst_full[top_gene_id_full, ]),
+  status = full_sample_info[colnames(selected_vst_full), "status"],
+  sex = full_sample_info[colnames(selected_vst_full), "sex"],
+  stringsAsFactors = FALSE
+)
+
+top_gene_plot_full <- ggplot(
+  top_gene_data_full,
+  aes(x = status, y = expression, colour = status, shape = sex)
+) +
+  geom_boxplot(outlier.shape = NA, width = 0.55, alpha = 0.18) +
+  geom_jitter(width = 0.08, size = 2.4) +
+  labs(
+    title = paste("Most significant gene (sex-corrected):", top_gene_symbol_full),
+    x = "Treatment group",
+    y = "Variance-stabilised expression",
+    shape = "Sex"
+  ) +
+  scale_colour_manual(values = GROUP_COLOURS) +
+  course_theme
+
+ggsave(file.path("results", "figures", "T13_top_gene_corrected.png"), top_gene_plot_full, width = 6.5, height = 4.5, dpi = 300)
+top_gene_plot_full
+```
+
+Multi-gene faceted plot, also showing sex as point shape:
+
+```{r}
+valid_de_full <- plot_de_full[!is.na(plot_de_full$padj), ]
+valid_de_full <- valid_de_full[order(valid_de_full$padj), ]
+top_gene_ids_full <- head(valid_de_full$gene_id, 6)
+
+expression_matrix_full <- t(selected_vst_full[top_gene_ids_full, , drop = FALSE])
+top_gene_long_full <- stack(as.data.frame(expression_matrix_full, check.names = FALSE))
+colnames(top_gene_long_full) <- c("expression", "gene_id")
+top_gene_long_full$sample_id <- rep(rownames(expression_matrix_full), ncol(expression_matrix_full))
+top_gene_long_full$status <- full_sample_info[top_gene_long_full$sample_id, "status"]
+top_gene_long_full$sex <- full_sample_info[top_gene_long_full$sample_id, "sex"]
+top_gene_long_full$symbol <- gene_annotation_full$symbol[match(as.character(top_gene_long_full$gene_id), gene_annotation_full$gene_id)]
+
+distribution_plot_full <- ggplot(
+  top_gene_long_full,
+  aes(x = status, y = expression, colour = status, shape = sex)
+) +
+  geom_boxplot(outlier.shape = NA, width = 0.55, alpha = 0.15) +
+  geom_jitter(width = 0.08, size = 1.8) +
+  facet_wrap(~ symbol, scales = "free_y") +
+  scale_colour_manual(values = GROUP_COLOURS) +
+  labs(x = "Treatment group", y = "Variance-stabilised expression", shape = "Sex") +
+  course_theme
+
+ggsave(file.path("results", "figures", "T13_top_gene_distributions_corrected.png"), distribution_plot_full, width = 9, height = 6, dpi = 300)
+distribution_plot_full
+```
+
+PCA restricted to SERO and HAT, using the corrected model's VST values:
+
+```{r}
+n_top_pca_genes_sel_full <- min(500, nrow(selected_vst_full))
+pca_gene_variance_sel_full <- apply(selected_vst_full, 1, var)
+top_pca_gene_ids_sel_full <- names(sort(pca_gene_variance_sel_full, decreasing = TRUE))[1:n_top_pca_genes_sel_full]
+pca_input_sel_full <- selected_vst_full[top_pca_gene_ids_sel_full, , drop = FALSE]
+
+pca_fit_sel_full <- prcomp(t(pca_input_sel_full), center = TRUE, scale. = FALSE)
+pca_variance_sel_full <- 100 * pca_fit_sel_full$sdev^2 / sum(pca_fit_sel_full$sdev^2)
+
+pca_data_sel_full <- as.data.frame(pca_fit_sel_full$x[, 1:2])
+pca_data_sel_full$sample_id <- rownames(pca_data_sel_full)
+pca_data_sel_full$status <- full_sample_info[pca_data_sel_full$sample_id, "status"]
+pca_data_sel_full$sex <- full_sample_info[pca_data_sel_full$sample_id, "sex"]
+
+pca_plot_sel_full <- ggplot(pca_data_sel_full, aes(PC1, PC2, colour = status, shape = sex)) +
+  geom_point(size = 3) +
+  scale_colour_manual(values = GROUP_COLOURS) +
+  labs(
+    title = "PCA of SERO TL+ and HAT samples (sex-corrected model)",
+    x = sprintf("PC1 (%.1f%% variance)", pca_variance_sel_full[1]),
+    y = sprintf("PC2 (%.1f%% variance)", pca_variance_sel_full[2]),
+    colour = "Treatment group",
+    shape = "Sex"
+  ) +
+  course_theme
+
+ggsave(file.path("results", "figures", "T13_PCA_corrected_sero_hat.png"), pca_plot_sel_full, width = 6.5, height = 5, dpi = 300)
+pca_plot_sel_full
+```
+
+::: {.callout-note title="Discuss"}
+The single-gene and multi-gene plots now show sex as point shape as well as status as colour. For the top gene, does expression separate mainly by status, mainly by sex, or by some combination of the two?
+:::
+
+## Section C (advanced): visualisation-only batch correction with limma
+
+```{r}
+#| message: false
+# install.packages("BiocManager"); BiocManager::install("limma")
+library(limma)
+```
+
+`limma::removeBatchEffect()` subtracts an estimated "sex effect" from every gene's expression value, purely so a plot looks tidier. This is **not** the same as adding sex to a design formula (Section B): it treats the entire sex effect as noise to delete, with no statistical test involved, and because sex and status are unevenly distributed here (HAT is mostly male), it can remove genuine status-associated signal along with the sex effect. Never run this on data that will go into a Wald or LRT test — use it only to produce a cleaner exploratory or presentation plot.
+
+```{r}
+vst_full_batch_corrected <- removeBatchEffect(vst_full, batch = full_sample_info$sex)
+
+n_top_pca_genes_bc <- min(500, nrow(vst_full_batch_corrected))
+pca_gene_variance_bc <- apply(vst_full_batch_corrected, 1, var)
+top_pca_gene_ids_bc <- names(sort(pca_gene_variance_bc, decreasing = TRUE))[1:n_top_pca_genes_bc]
+pca_input_bc <- vst_full_batch_corrected[top_pca_gene_ids_bc, , drop = FALSE]
+
+pca_fit_bc <- prcomp(t(pca_input_bc), center = TRUE, scale. = FALSE)
+pca_variance_bc <- 100 * pca_fit_bc$sdev^2 / sum(pca_fit_bc$sdev^2)
+
+pca_data_bc <- as.data.frame(pca_fit_bc$x[, 1:2])
+pca_data_bc$sample_id <- rownames(pca_data_bc)
+pca_data_bc$status <- full_sample_info[pca_data_bc$sample_id, "status"]
+pca_data_bc$sex <- full_sample_info[pca_data_bc$sample_id, "sex"]
+```
+
+```{r}
+pca_plot_bc_status <- ggplot(pca_data_bc, aes(PC1, PC2, colour = status)) +
+  geom_point(size = 3) +
+  scale_colour_manual(values = GROUP_COLOURS) +
+  labs(
+    title = "PCA after removing the sex effect (visualisation only)",
+    x = sprintf("PC1 (%.1f%% variance)", pca_variance_bc[1]),
+    y = sprintf("PC2 (%.1f%% variance)", pca_variance_bc[2]),
+    colour = "Treatment group"
+  ) +
+  course_theme
+
+ggsave(file.path("results", "figures", "T13_PCA_batch_corrected_by_status.png"), pca_plot_bc_status, width = 6.5, height = 5, dpi = 300)
+pca_plot_bc_status
+```
+
+```{r}
+pca_plot_bc_sex <- ggplot(pca_data_bc, aes(PC1, PC2, colour = sex)) +
+  geom_point(size = 3) +
+  scale_colour_manual(values = SEX_COLOURS) +
+  labs(
+    title = "PCA after removing the sex effect (visualisation only)",
+    x = sprintf("PC1 (%.1f%% variance)", pca_variance_bc[1]),
+    y = sprintf("PC2 (%.1f%% variance)", pca_variance_bc[2]),
+    colour = "Sex"
+  ) +
+  course_theme
+
+ggsave(file.path("results", "figures", "T13_PCA_batch_corrected_by_sex.png"), pca_plot_bc_sex, width = 6.5, height = 5, dpi = 300)
+pca_plot_bc_sex
+```
+
+::: {.callout-note title="Interpretation checkpoint"}
+Compare this PCA with Section A's version:
+
+- After removing the sex effect, does PC1 now track status more cleanly?
+- Do the two sexes still separate at all, or has that structure gone?
+
+This plot can look reassuringly clean — remember that it was produced by deleting a whole source of variation from the data, not by testing it.
+:::
+
+::: {.callout-note title="Analytical choice"}
+Section B (covariate in the model) and Section C (removing the batch effect from the data) can produce visually similar PCA plots. Only Section B's approach is valid before a statistical test: it keeps the uncertainty associated with the sex effect in the model instead of deleting it, so the reported p-values and fold changes remain honest.
+:::
+
+## Summary
+
+You've now:
+
+- loaded the complete dataset and seen that biological sex is a major, unmodelled source of variation
+- read a PCA plot for evidence of confounding between two variables in an unbalanced design
+- rebuilt a DESeq2 model to include sex as a covariate, and compared its statistical power with the naive model
+- remade the core visualisations (volcano, MA, heatmap, single-gene, multi-gene, PCA) using the complete, sex-corrected data
+- used `limma::removeBatchEffect()` for an exploratory plot only, and explained why it is not appropriate before statistical testing
+
+This is the final core tutorial. Chapter 12's "Stretch goals" section suggests where to take your own analysis next.

@@ -3,24 +3,51 @@ project:
   output-dir: docs
 
 book:
-  title: "Quatro Example Book"
-  author: "Paul Capewell"
-  date: ""
+  title: "Bioinformatics with R"
+  author: "Paul Capewell & Annabelle Smith"
+  downloads:
+    - pdf
+    - epub
   chapters:
     - index.qmd
-    - intro.qmd
-    - summary.qmd
-    - references.qmd
+    - chapter01.qmd
+    - chapter02.qmd
+    - chapter03.qmd
+    - chapter04.qmd
+    - chapter05_restructured.qmd
+    - chapter06_restructured.qmd
+    - chapter07_restructured.qmd
+    - chapter08_restructured.qmd
+    - chapter09.qmd
+    - chapter10.qmd
+    - chapter11.qmd
+    - chapter12.qmd
+    - chapter13.qmd
+    - chapter14.qmd
+#    - references.qmd
 
 bibliography: references.bib
 
 format:
   html:
+    include-in-header:
+      text: |
+        <script src="https://unpkg.com/@popperjs/core@2"></script>
+        <script src="https://unpkg.com/tippy.js@6"></script>
+        <link rel="stylesheet" href="https://unpkg.com/tippy.js@6/animations/scale.css" />
     theme:
-      - cosmo
-      - brand
+      light: flatly
+      dark: darkly
+    toc: true
+    page-navigation: true
+    search: true
+    code-copy: hover
+    code-overflow: wrap
+    highlight-style: a11y
+    css: styles.css
 #  pdf:
 #    documentclass: scrreprt # only works if latex is installed
+#    toc: true
 
 
 

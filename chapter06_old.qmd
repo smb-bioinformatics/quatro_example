@@ -1,0 +1,320 @@
+# Visualising Differential Analysis Results
+
+## What you'll learn
+
+In this tutorial, you'll match the Ensembl gene IDs in your differential expression results against an annotation file to add readable gene symbols, then create publication-quality visualisations of the results, including volcano plots and MA plots.
+
+::: {.callout-note}
+## Learning outcomes
+By the end of this chapter you should be able to:
+
+- inspect an unannotated result and an annotation table
+- identify corresponding key columns in two tables
+- explain what `match()` returns
+- use returned positions to retrieve aligned annotation
+- validate missing and duplicated identifiers or symbols
+- retain Ensembl IDs alongside readable symbols
+- create a fallback display label without overwriting the annotation
+- derive plotting columns using arithmetic and logical conditions
+- construct and interpret volcano and MA plots
+- save figures and annotated results
+:::
+
+::: {.callout-tip title="Recap: recovering Chapter 4's outputs" collapse="true"}
+This block is a **recovery route**, not new teaching. It reruns the final Chapter 4 steps using the same object names, so that this chapter can start from the same unannotated result without repeating the filtering and model-fitting explanations.
+
+```{r}
+#| message: false
+dir.create("results", showWarnings = FALSE)
+dir.create(file.path("results", "tables"), recursive = TRUE, showWarnings = FALSE)
+dir.create(file.path("results", "figures"), recursive = TRUE, showWarnings = FALSE)
+
+library(DESeq2)
+library(ggplot2)
+
+dds_fitted <- readRDS(
+  file.path("results", "objects", "dds_fitted.rds")
+)
+
+res_hat_vs_sero <- results(
+  dds_fitted,
+  contrast = c("status", "hat", "sero"),
+  alpha = 0.05
+)
+
+result_data <- read.csv(
+  file.path("results", "tables", "T04_DE_hat_vs_sero_unannotated.csv"),
+  stringsAsFactors = FALSE
+)
+```
+:::
+
+## Retrieving the unannotated result
+
+In Chapter 4, we saved `result_data`, but the only gene identifier it contains is the Ensembl ID:
+
+```{r}
+head(result_data, 5)
+```
+
+Ensembl IDs such as `ENSG00000000003` uniquely and stably identify a gene, but they are difficult to interpret at a glance. Before we can label a plot or discuss a result with a colleague, we usually want the more familiar gene **symbol** (for example `TP53`) as well.
+
+## Inspecting the annotation table
+
+An annotation file maps Ensembl IDs to gene symbols and other information. The exported CSV stores its row names as an unlabelled first column, so we import it with `row.names = 1` to avoid carrying that duplicate column into our analysis:
+
+```{r}
+annotation_file <- read.csv(
+  "human_annotations_from_orgHs.csv",
+  row.names = 1,
+  check.names = FALSE,
+  stringsAsFactors = FALSE
+)
+
+dim(annotation_file)
+colnames(annotation_file)
+head(annotation_file)
+```
+
+```{r}
+length(unique(annotation_file$ENSEMBL)) == nrow(annotation_file)
+
+sum(is.na(annotation_file$SYMBOL_SAFE) | annotation_file$SYMBOL_SAFE == "")
+```
+
+::: {.callout-tip title="Try it yourself"}
+Identify the matching key in `result_data` and the corresponding key in `annotation_file`. Which column will we retrieve a value from once the two tables are matched?
+
+::: {.callout-tip collapse="true" title="Solution"}
+`result_data$gene_id` is the matching key in the results table, and `annotation_file$ENSEMBL` is the corresponding key in the annotation table. Once matched, we will retrieve values from `annotation_file$SYMBOL_SAFE`.
+:::
+:::
+
+::: {.callout-tip title="Try it yourself"}
+Does `annotation_file` contain exactly one row per gene in `result_data`? Compare `nrow(annotation_file)` with `nrow(result_data)`. Why might these numbers differ even though both describe genes from the same genome?
+:::
+
+## What does `match()` return?
+
+We need to look up the correct row of `annotation_file` for every gene in `result_data`. The `match()` function does exactly this: `match(x, table)` returns, for each value in `x`, the **position** of its first occurrence in `table` (or `NA` if it is not found).
+
+::: {.callout-tip title="Try it yourself: predict the output"}
+Before running the code, predict what each statement will return:
+
+```r
+match(c("b", "d", "a"), c("a", "b", "c"))
+```
+
+1. What position is `"b"` found at in the second vector?
+2. What position is `"a"` found at?
+3. Why does the statement return `NA` for `"d"`?
+:::
+
+::: {.callout-tip collapse="true" title="Solution"}
+```{r}
+match(c("b", "d", "a"), c("a", "b", "c"))
+```
+`"b"` is the second element of `c("a", "b", "c")`, so its position is `2`. `"a"` is the first element, so its position is `1`. `"d"` does not appear at all in `c("a", "b", "c")`, so `match()` returns `NA` for it.
+:::
+
+## Calculating matching positions
+
+We use `match()` to find the row of `annotation_file` corresponding to each gene ID in our results table:
+
+```{r}
+matched_rows <- match(
+  result_data$gene_id,
+  annotation_file$ENSEMBL
+)
+
+head(matched_rows)
+```
+
+Each value in `matched_rows` is the row of `annotation_file` that describes the corresponding gene in `result_data` — or `NA` if that gene ID was not found in the annotation file.
+
+## Validating the matches
+
+Before adding anything to `result_data`, we check how many gene IDs failed to match:
+
+```{r}
+sum(is.na(matched_rows))
+```
+
+::: {.callout-tip title="Try it yourself"}
+If `sum(is.na(matched_rows))` is small relative to `nrow(result_data)`, is that necessarily a problem? What might cause a small number of genes to have no match in the annotation file?
+:::
+
+## Adding gene symbols
+
+We use `matched_rows` to index the `SYMBOL_SAFE` column of `annotation_file`, producing one symbol per gene in our results table, in the same order:
+
+```{r}
+result_data$symbol <- annotation_file$SYMBOL_SAFE[matched_rows]
+
+head(result_data[, c("gene_id", "symbol")])
+```
+
+## Checking missing and duplicated symbols
+
+Not every gene ID has a usable symbol. Some genes were never found in the annotation file (`match()` returned `NA`), and some rows of the annotation file record an empty string instead of a real symbol.
+
+```{r}
+missing_symbol <- is.na(result_data$symbol) | result_data$symbol == ""
+sum(missing_symbol)
+```
+
+::: {.callout-tip title="Try it yourself"}
+`table(duplicated(result_data$symbol))` counts how many symbols appear more than once. Why might the same gene symbol legitimately appear on more than one row? Is a duplicated symbol necessarily an error?
+:::
+
+## Creating a fallback display label
+
+`symbol` should stay exactly as it came from the annotation file, including any missing values — overwriting it would hide the fact that some genes were never matched. Instead, we create a separate `display_label` column, used only for labelling plots, that falls back to the Ensembl ID when no symbol is available:
+
+```{r}
+result_data$display_label <- result_data$symbol
+
+result_data$display_label[missing_symbol] <- result_data$gene_id[missing_symbol]
+
+head(result_data[, c("gene_id", "symbol", "display_label")])
+```
+
+`gene_id` still reliably identifies exactly one gene, `symbol` records the raw annotation result (including any gaps), and `display_label` is always populated, ready for plotting.
+
+```{r}
+write.csv(
+  result_data,
+  file.path("results", "tables", "T06_DE_hat_vs_sero_annotated.csv"),
+  row.names = FALSE
+)
+```
+
+## Preparing the data for plotting
+
+A volcano plot needs two derived columns: a $-\log_{10}$ transformed p-value (so smaller p-values plot higher), and a category describing the direction and significance of each gene.
+
+```{r}
+plot_de <- result_data
+plot_de$minus_log10_padj <- -log10(plot_de$padj)
+```
+
+::: {.callout-tip title="Try it yourself: think before you plot"}
+What happens to `minus_log10_padj` as `padj` gets smaller and smaller? Could `padj = 0` ever produce a usable value? How might `geom_point(na.rm = TRUE)` help when some genes have `padj = NA`?
+
+::: {.callout-tip title="Solution" collapse="true"}
+As `padj` shrinks towards 0, `-log10(padj)` grows towards infinity — very significant genes plot very high on the y-axis. `padj = 0` would give `Inf`, which `ggplot2` cannot place on a finite axis. `na.rm = TRUE` tells `geom_point()` to silently drop rows with missing values (genes DESeq2 didn't test) rather than throwing a warning for each one.
+:::
+:::
+
+Now categorise each gene by direction and significance:
+
+```{r}
+plot_de$direction <- "Not significant"
+plot_de$direction[
+  !is.na(plot_de$padj) & plot_de$padj < 0.05 & plot_de$log2FoldChange > 1
+] <- "Higher in HAT"
+plot_de$direction[
+  !is.na(plot_de$padj) & plot_de$padj < 0.05 & plot_de$log2FoldChange < -1
+] <- "Higher in SERO TL+"
+
+table(plot_de$direction)
+```
+
+## The volcano plot
+
+::: {.callout-tip title="Try it yourself: build it one layer at a time"}
+Rather than pasting a finished plot, build it up gradually and look at the result after each addition:
+
+1. `ggplot(plot_de, aes(x = log2FoldChange, y = minus_log10_padj, colour = direction))`
+2. add `+ geom_point(alpha = 0.6, size = 1.3, na.rm = TRUE)`
+3. add dashed threshold lines with `geom_vline()` and `geom_hline()`
+4. add `scale_colour_manual()`, `labs()`, and a theme
+
+What changes visually at each step? Which layer actually creates the scatter of points?
+
+::: {.callout-tip title="Solution" collapse="true"}
+```{r}
+volcano_plot <- ggplot(
+  plot_de,
+  aes(x = log2FoldChange, y = minus_log10_padj, colour = direction)
+) +
+  geom_point(alpha = 0.6, size = 1.3, na.rm = TRUE) +
+  geom_vline(xintercept = c(-1, 1), linetype = "dashed", colour = "grey50") +
+  geom_hline(yintercept = -log10(0.05), linetype = "dashed", colour = "grey50") +
+  scale_colour_manual(values = c(
+    "Higher in SERO TL+" = "#B2182B",
+    "Higher in HAT" = "#2166AC",
+    "Not significant" = "grey70"
+  )) +
+  labs(
+    title = "Volcano plot: HAT versus SERO TL+",
+    x = "log2 fold change (HAT vs SERO)",
+    y = "-log10 adjusted p-value",
+    colour = "Expression direction"
+  ) +
+  theme_classic()
+
+ggsave(file.path("results", "figures", "T06_volcano_hat_vs_sero.png"), volcano_plot, width = 7, height = 5, dpi = 300)
+volcano_plot
+```
+The `geom_point()` layer is what actually draws the scatter of dots; everything else (lines, colours, labels, theme) only decorates it.
+:::
+:::
+
+::: {.callout-tip title="Try it yourself: label a few genes"}
+Install and load the `ggrepel` package. Using `geom_text_repel()`, add labels for **no more than five** genes, chosen using a rule you can justify (for example: the five most significant genes, or the largest positive and negative fold changes). Do not label every significant point — with hundreds of genes, the plot becomes unreadable. Label the points using `display_label`, not `symbol`, so that genes without a symbol still show a readable identifier.
+
+::: {.callout-tip title="Solution" collapse="true"}
+```{r}
+#| eval: false
+# install.packages("ggrepel")
+library(ggrepel)
+
+top_labels <- head(plot_de[order(plot_de$padj), ], 5)
+
+volcano_plot +
+  geom_text_repel(data = top_labels, aes(label = display_label), colour = "black", size = 3)
+```
+:::
+:::
+
+## The MA plot
+
+An MA plot shows mean expression (x-axis) against fold change (y-axis), which helps you see whether large effects are concentrated among low-expression genes (a common artefact).
+
+```{r}
+png(file.path("results", "figures", "T06_MA_hat_vs_sero.png"), width = 1600, height = 1200, res = 200)
+plotMA(res_hat_vs_sero, alpha = 0.05, main = "MA plot: HAT versus SERO TL+")
+dev.off()
+```
+
+```{r}
+#| echo: false
+plotMA(res_hat_vs_sero, alpha = 0.05, main = "MA plot: HAT versus SERO TL+")
+```
+
+::: {.callout-note title="Interpretation checkpoint"}
+Compare the volcano and MA plots:
+
+- Which plot emphasises statistical significance most clearly?
+- Which plot reveals whether large effects are expression-dependent?
+- Are the largest fold changes confined to low-expression genes in your data?
+:::
+
+## Summary
+
+You've now:
+
+- inspected an unannotated result and an annotation table before combining them
+- identified the matching key columns in both tables
+- used `match()` to calculate the position of each gene in the annotation table
+- validated how many gene IDs failed to match before using the result
+- added a `symbol` column while retaining the original `gene_id` column
+- checked for missing and duplicated symbols after matching
+- created a separate `display_label` column, so the raw `symbol` annotation was never overwritten
+- derived plotting-ready columns from a DE results table
+- built a volcano plot layer by layer, and understand what each layer contributes
+- created and saved an MA plot
+- practised interpreting significance-based and expression-dependent visualisations together
+
+In the next chapter, we'll build a consistent colour scheme and single-gene plot that we'll reuse for the rest of the course.

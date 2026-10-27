@@ -1,0 +1,1462 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.38">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>10&nbsp; Assessment Workshop and R Catch-up – Bioinformatics with R</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<link href="./chapter11.html" rel="next">
+<link href="./chapter09.html" rel="prev">
+<script src="site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-33269adcf1721b81efc5ea7fcfe7f0ee.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-dark-5a2acb6f4ed5aeb23a104ba421924b87.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-33269adcf1721b81efc5ea7fcfe7f0ee.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap-82be1df1625442a14a32b67ca9799ca5.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="site_libs/bootstrap/bootstrap-dark-407db9a3e711352b026d38d8f50b5f87.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="site_libs/bootstrap/bootstrap-82be1df1625442a14a32b67ca9799ca5.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script src="https://unpkg.com/@popperjs/core@2"></script>
+<script src="https://unpkg.com/tippy.js@6"></script>
+<link rel="stylesheet" href="https://unpkg.com/tippy.js@6/animations/scale.css">
+
+
+<link rel="stylesheet" href="styles.css">
+</head>
+
+<body class="nav-sidebar floating quarto-light"><script id="quarto-html-before-body" type="application/javascript">
+    const toggleBodyColorMode = (bsSheetEl) => {
+      const mode = bsSheetEl.getAttribute("data-mode");
+      const bodyEl = window.document.querySelector("body");
+      if (mode === "dark") {
+        bodyEl.classList.add("quarto-dark");
+        bodyEl.classList.remove("quarto-light");
+      } else {
+        bodyEl.classList.add("quarto-light");
+        bodyEl.classList.remove("quarto-dark");
+      }
+    }
+    const toggleBodyColorPrimary = () => {
+      const bsSheetEl = window.document.querySelector("link#quarto-bootstrap:not([rel=disabled-stylesheet])");
+      if (bsSheetEl) {
+        toggleBodyColorMode(bsSheetEl);
+      }
+    }
+    const setColorSchemeToggle = (alternate) => {
+      const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+      for (let i=0; i < toggles.length; i++) {
+        const toggle = toggles[i];
+        if (toggle) {
+          if (alternate) {
+            toggle.classList.add("alternate");
+          } else {
+            toggle.classList.remove("alternate");
+          }
+        }
+      }
+    };
+    const toggleColorMode = (alternate) => {
+      // Switch the stylesheets
+      const primaryStylesheets = window.document.querySelectorAll('link.quarto-color-scheme:not(.quarto-color-alternate)');
+      const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+      manageTransitions('#quarto-margin-sidebar .nav-link', false);
+      if (alternate) {
+        // note: dark is layered on light, we don't disable primary!
+        enableStylesheet(alternateStylesheets);
+        for (const sheetNode of alternateStylesheets) {
+          if (sheetNode.id === "quarto-bootstrap") {
+            toggleBodyColorMode(sheetNode);
+          }
+        }
+      } else {
+        disableStylesheet(alternateStylesheets);
+        enableStylesheet(primaryStylesheets)
+        toggleBodyColorPrimary();
+      }
+      manageTransitions('#quarto-margin-sidebar .nav-link', true);
+      // Switch the toggles
+      setColorSchemeToggle(alternate)
+      // Hack to workaround the fact that safari doesn't
+      // properly recolor the scrollbar when toggling (#1455)
+      if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+        manageTransitions("body", false);
+        window.scrollTo(0, 1);
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+          manageTransitions("body", true);
+        }, 40);
+      }
+    }
+    const disableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        stylesheet.rel = 'disabled-stylesheet';
+      }
+    }
+    const enableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        if(stylesheet.rel !== 'stylesheet') { // for Chrome, which will still FOUC without this check
+          stylesheet.rel = 'stylesheet';
+        }
+      }
+    }
+    const manageTransitions = (selector, allowTransitions) => {
+      const els = window.document.querySelectorAll(selector);
+      for (let i=0; i < els.length; i++) {
+        const el = els[i];
+        if (allowTransitions) {
+          el.classList.remove('notransition');
+        } else {
+          el.classList.add('notransition');
+        }
+      }
+    }
+    const isFileUrl = () => {
+      return window.location.protocol === 'file:';
+    }
+    const hasAlternateSentinel = () => {
+      let styleSentinel = getColorSchemeSentinel();
+      if (styleSentinel !== null) {
+        return styleSentinel === "alternate";
+      } else {
+        return false;
+      }
+    }
+    const setStyleSentinel = (alternate) => {
+      const value = alternate ? "alternate" : "default";
+      if (!isFileUrl()) {
+        window.localStorage.setItem("quarto-color-scheme", value);
+      } else {
+        localAlternateSentinel = value;
+      }
+    }
+    const getColorSchemeSentinel = () => {
+      if (!isFileUrl()) {
+        const storageValue = window.localStorage.getItem("quarto-color-scheme");
+        return storageValue != null ? storageValue : localAlternateSentinel;
+      } else {
+        return localAlternateSentinel;
+      }
+    }
+    const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+      const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+      const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+      let newTheme = '';
+      if(authorPrefersDark) {
+        newTheme = isAlternate ? baseTheme : alternateTheme;
+      } else {
+        newTheme = isAlternate ? alternateTheme : baseTheme;
+      }
+      const changeGiscusTheme = () => {
+        // From: https://github.com/giscus/giscus/issues/336
+        const sendMessage = (message) => {
+          const iframe = document.querySelector('iframe.giscus-frame');
+          if (!iframe) return;
+          iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+        }
+        sendMessage({
+          setConfig: {
+            theme: newTheme
+          }
+        });
+      }
+      const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+      if (isGiscussLoaded) {
+        changeGiscusTheme();
+      }
+    };
+    const authorPrefersDark = false;
+    const darkModeDefault = authorPrefersDark;
+      document.querySelector('link#quarto-text-highlighting-styles.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+      document.querySelector('link#quarto-bootstrap.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+    let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+    // Dark / light mode switch
+    window.quartoToggleColorScheme = () => {
+      // Read the current dark / light value
+      let toAlternate = !hasAlternateSentinel();
+      toggleColorMode(toAlternate);
+      setStyleSentinel(toAlternate);
+      toggleGiscusIfUsed(toAlternate, darkModeDefault);
+      window.dispatchEvent(new Event('resize'));
+    };
+    // Switch to dark mode if need be
+    if (hasAlternateSentinel()) {
+      toggleColorMode(true);
+    } else {
+      toggleColorMode(false);
+    }
+  </script>
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./chapter10.html"><span class="chapter-number">10</span>&nbsp; <span class="chapter-title">Assessment Workshop and R Catch-up</span></a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <div class="pt-lg-2 mt-2 text-left sidebar-header">
+    <div class="sidebar-title mb-0 py-0">
+      <a href="./">Bioinformatics with R</a> 
+        <div class="sidebar-tools-main">
+    <div class="dropdown">
+      <a href="" title="Download" id="quarto-navigation-tool-dropdown-0" class="quarto-navigation-tool dropdown-toggle px-1" data-bs-toggle="dropdown" aria-expanded="false" role="link" aria-label="Download"><i class="bi bi-download"></i></a>
+      <ul class="dropdown-menu" aria-labelledby="quarto-navigation-tool-dropdown-0">
+          <li>
+            <a class="dropdown-item sidebar-tools-main-item" href="./Bioinformatics-with-R.pdf">
+              <i class="bi bi-file-pdf pe-1"></i>
+            Download PDF
+            </a>
+          </li>
+          <li>
+            <a class="dropdown-item sidebar-tools-main-item" href="./Bioinformatics-with-R.epub">
+              <i class="bi bi-journal pe-1"></i>
+            Download ePub
+            </a>
+          </li>
+      </ul>
+    </div>
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+    </div>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Overview</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapter01.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">1</span>&nbsp; <span class="chapter-title">Setting Up R and RStudio</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapter02.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">2</span>&nbsp; <span class="chapter-title">Getting Started with the HAT dataset</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapter03.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">3</span>&nbsp; <span class="chapter-title">Sample-Level Summaries and Visualisation</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapter04.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">4</span>&nbsp; <span class="chapter-title">Transforming and Reshaping Data</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapter05_restructured.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">5</span>&nbsp; <span class="chapter-title">Preparing Data for Differential-Expression Analysis</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapter06_restructured.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">6</span>&nbsp; <span class="chapter-title">Fitting and Interpreting the Differential-Expression Model</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapter07_restructured.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">7</span>&nbsp; <span class="chapter-title">Exploring and Annotating Gene-Level Results</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapter08_restructured.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">8</span>&nbsp; <span class="chapter-title">Exploring Relationships Among Samples</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapter09.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">9</span>&nbsp; <span class="chapter-title">Customising Data Visualisations</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapter10.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text"><span class="chapter-number">10</span>&nbsp; <span class="chapter-title">Assessment Workshop and R Catch-up</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapter11.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">11</span>&nbsp; <span class="chapter-title">Pattern discovery, hierarchical clustering and heatmaps</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapter12.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">12</span>&nbsp; <span class="chapter-title">Gene-expression signatures</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapter13.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">13</span>&nbsp; <span class="chapter-title">Functional Enrichment Analysis</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapter14.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">14</span>&nbsp; <span class="chapter-title">Comparing Multiple Groups and Contrasts</span></span></a>
+  </div>
+</li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Table of contents</h2>
+   
+  <ul>
+  <li><a href="#what-youll-learn" id="toc-what-youll-learn" class="nav-link active" data-scroll-target="#what-youll-learn"><span class="header-section-number">10.1</span> What you’ll learn</a></li>
+  <li><a href="#why-reproducibility-matters" id="toc-why-reproducibility-matters" class="nav-link" data-scroll-target="#why-reproducibility-matters"><span class="header-section-number">10.2</span> Why reproducibility matters</a></li>
+  <li><a href="#commenting-and-documenting-code" id="toc-commenting-and-documenting-code" class="nav-link" data-scroll-target="#commenting-and-documenting-code"><span class="header-section-number">10.3</span> Commenting and documenting code</a>
+  <ul class="collapse">
+  <li><a href="#use-headings-to-organise-a-script" id="toc-use-headings-to-organise-a-script" class="nav-link" data-scroll-target="#use-headings-to-organise-a-script"><span class="header-section-number">10.3.1</span> Use headings to organise a script</a></li>
+  <li><a href="#record-decisions-not-just-commands" id="toc-record-decisions-not-just-commands" class="nav-link" data-scroll-target="#record-decisions-not-just-commands"><span class="header-section-number">10.3.2</span> Record decisions, not just commands</a></li>
+  </ul></li>
+  <li><a href="#recording-your-session-information" id="toc-recording-your-session-information" class="nav-link" data-scroll-target="#recording-your-session-information"><span class="header-section-number">10.4</span> Recording your session information</a></li>
+  <li><a href="#sharing-projects-responsibly-with-github" id="toc-sharing-projects-responsibly-with-github" class="nav-link" data-scroll-target="#sharing-projects-responsibly-with-github"><span class="header-section-number">10.5</span> Sharing projects responsibly with GitHub</a>
+  <ul class="collapse">
+  <li><a href="#use-.gitignore-to-exclude-files" id="toc-use-.gitignore-to-exclude-files" class="nav-link" data-scroll-target="#use-.gitignore-to-exclude-files"><span class="header-section-number">10.5.1</span> Use <code>.gitignore</code> to exclude files</a></li>
+  <li><a href="#install-github-desktop" id="toc-install-github-desktop" class="nav-link" data-scroll-target="#install-github-desktop"><span class="header-section-number">10.5.2</span> Install GitHub Desktop</a></li>
+  <li><a href="#make-one-small-meaningful-commit" id="toc-make-one-small-meaningful-commit" class="nav-link" data-scroll-target="#make-one-small-meaningful-commit"><span class="header-section-number">10.5.3</span> Make one small, meaningful commit</a></li>
+  </ul></li>
+  <li><a href="#r-catch-up-quick-review" id="toc-r-catch-up-quick-review" class="nav-link" data-scroll-target="#r-catch-up-quick-review"><span class="header-section-number">10.6</span> R catch-up: quick review</a></li>
+  <li><a href="#common-errors-and-how-to-read-them" id="toc-common-errors-and-how-to-read-them" class="nav-link" data-scroll-target="#common-errors-and-how-to-read-them"><span class="header-section-number">10.7</span> Common errors and how to read them</a></li>
+  <li><a href="#peer-review" id="toc-peer-review" class="nav-link" data-scroll-target="#peer-review"><span class="header-section-number">10.8</span> Peer review</a></li>
+  <li><a href="#optional-challenge-git-from-the-command-line" id="toc-optional-challenge-git-from-the-command-line" class="nav-link" data-scroll-target="#optional-challenge-git-from-the-command-line"><span class="header-section-number">10.9</span> Optional challenge: Git from the command line</a></li>
+  <li><a href="#summary" id="toc-summary" class="nav-link" data-scroll-target="#summary"><span class="header-section-number">10.10</span> Summary</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title"><span class="chapter-number">10</span>&nbsp; <span class="chapter-title">Assessment Workshop and R Catch-up</span></h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="what-youll-learn" class="level2" data-number="10.1">
+<h2 data-number="10.1" class="anchored" data-anchor-id="what-youll-learn"><span class="header-section-number">10.1</span> What you’ll learn</h2>
+<p>In this tutorial, you’ll consolidate your learning with a light workshop session, check that your assessment workflow is reproducible and address any lingering questions about R basics.</p>
+<div class="callout callout-style-default callout-note callout-titled" title="Learning outcomes">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Learning outcomes
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>By the end of this chapter you should be able to:</p>
+<ul>
+<li>explain why reproducibility matters in bioinformatics</li>
+<li>use comments to document the purpose of code and important analysis decisions</li>
+<li>rerun a workflow from a clean R session</li>
+<li>identify the inputs, parameters, outputs, and software versions behind a result</li>
+<li>explain how Git and GitHub can support a reproducible analysis</li>
+<li>identify information that should not be uploaded to a public repository</li>
+<li>diagnose a common R error from its message and the structure of the relevant object</li>
+<li>audit a draft piece of work for reproducibility and clear communication</li>
+</ul>
+<p><strong>ISCB alignment:</strong> E3 (document analytical decisions, record software versions, organise project outputs and manage code and data responsibly), F3 (use Git, GitHub and <code>.gitignore</code> appropriately to support reproducible bioinformatics workflows), H3 (review core R operations and diagnose common coding and object-structure errors), I3 (apply responsible data-sharing, privacy and research-ethics principles to patient-derived data), K3 (communicate analysis decisions clearly through comments, README files, figure documentation and peer review).</p>
+</div>
+</div>
+</section>
+<section id="why-reproducibility-matters" class="level2" data-number="10.2">
+<h2 data-number="10.2" class="anchored" data-anchor-id="why-reproducibility-matters"><span class="header-section-number">10.2</span> Why reproducibility matters</h2>
+<p>Imagine that you complete your assessment today and revisit it several months later. Would you be able to run the analysis again and obtain the same results?</p>
+<p>A reproducible analysis allows another person, or your future self, to:</p>
+<ul>
+<li>identify the original data used</li>
+<li>understand each analysis step</li>
+<li>follow the reasoning behind important decisions</li>
+<li>run the code successfully</li>
+<li>generate the same outputs</li>
+</ul>
+<p>In bioinformatics, reproducibility is especially important because analyses often involve multiple files, software packages, parameters, and processing steps.</p>
+<p>Good reproducibility habits include:</p>
+<ul>
+<li>keeping project files organised</li>
+<li>writing clear code that runs in a logical order</li>
+<li>adding useful comments</li>
+<li>recording important analysis decisions and settings</li>
+<li>recording software and package versions</li>
+<li>sharing code and data responsibly</li>
+</ul>
+<div class="callout callout-style-default callout-tip callout-titled" title="A useful question">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>A useful question
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>For each result in your assessment, ask:</p>
+<blockquote class="blockquote">
+<p>Could another student understand how I produced this result without me explaining it to them?</p>
+</blockquote>
+</div>
+</div>
+</section>
+<section id="commenting-and-documenting-code" class="level2" data-number="10.3">
+<h2 data-number="10.3" class="anchored" data-anchor-id="commenting-and-documenting-code"><span class="header-section-number">10.3</span> Commenting and documenting code</h2>
+<p>You may have noticed that some lines in R code begin with a hash symbol, <code>#</code>. These lines are called <strong>comments</strong>.</p>
+<p>R ignores everything after <code>#</code> on that line. Comments are written for people reading the code and are not treated as instructions for R.</p>
+<p>Comments can help us:</p>
+<ul>
+<li>explain the purpose of a section of code</li>
+<li>record why an analytic decision was made</li>
+<li>make a script easier to navigate</li>
+<li>help someone else understand and reuse our analysis</li>
+<li>remind our future selves what the code was intended to do</li>
+</ul>
+<p>A useful comment normally explains <strong>why</strong> a function is being run or what a group of statements is intended to achieve. It should not simply repeat something that is already obvious from the code.</p>
+<p>For example, this comment is not especially helpful:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Use dim on count_data</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">dim</span>(count_data)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>This version better explains the purpose of the statement at this point in the script:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Confirm the number of imported genes (rows) and samples (columns)</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">dim</span>(count_data)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Comments can also record an important analysis decision:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Remove genes with fewer than 10 counts across all samples</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="co"># to reduce noise from very low-count genes.</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>count_data <span class="ot">&lt;-</span> count_data[<span class="fu">rowSums</span>(count_data) <span class="sc">&gt;=</span> <span class="dv">10</span>, ]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The comment explains the purpose of the filtering step and records the threshold that was used.</p>
+<p>Comments should be useful but concise. Too many comments can make a script harder to read, particularly when every simple function has a comment that merely repeats the code.</p>
+<div class="callout callout-style-default callout-tip callout-titled" title="Quick check">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Quick check
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Which comment would be more useful to someone reviewing your project several months later?</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Make volcano plot</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(...)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>or</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Visualise differential expression results and highlight genes</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="co"># meeting the significance threshold used in the report.</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(...)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The second comment is more useful because it describes the purpose of the figure rather than simply naming the type of plot.</p>
+</div>
+</div>
+<section id="use-headings-to-organise-a-script" class="level3" data-number="10.3.1">
+<h3 data-number="10.3.1" class="anchored" data-anchor-id="use-headings-to-organise-a-script"><span class="header-section-number">10.3.1</span> Use headings to organise a script</h3>
+<p>Comments can also divide a longer script into sections. RStudio recognises section headings written in this form:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Import data -------------------------------------------------------------</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Check sample identifiers ------------------------------------------------</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Filter low-count genes --------------------------------------------------</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Differential expression analysis ---------------------------------------</span></span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Create figures ----------------------------------------------------------</span></span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a><span class="co"># Save outputs ------------------------------------------------------------</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>This makes the script easier to scan and provides navigation in RStudio’s document outline.</p>
+</section>
+<section id="record-decisions-not-just-commands" class="level3" data-number="10.3.2">
+<h3 data-number="10.3.2" class="anchored" data-anchor-id="record-decisions-not-just-commands"><span class="header-section-number">10.3.2</span> Record decisions, not just commands</h3>
+<p>Some information cannot be reconstructed from the code alone. Record decisions such as:</p>
+<ul>
+<li>why a filtering threshold was chosen</li>
+<li>why a sample was excluded</li>
+<li>which group was used as the reference level</li>
+<li>which statistical test or model was selected</li>
+<li>whether default settings were changed</li>
+<li>where the original data came from</li>
+</ul>
+<p>These details may be recorded in comments, the assessment report, or a short <code>README.md</code> file.</p>
+<p>A useful <code>README.md</code> might state:</p>
+<ul>
+<li>the purpose of the project</li>
+<li>where the data came from</li>
+<li>the order in which scripts should be run</li>
+<li>which outputs the scripts create</li>
+<li>any important assumptions or decisions</li>
+</ul>
+<div class="callout callout-style-default callout-important callout-titled" title="Mini audit: improve one comment">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Important</span>Mini audit: improve one comment
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Find one comment in your assessment code that only repeats the command below it. Rewrite the comment so that it explains the <strong>purpose</strong> of the step or the <strong>reason</strong> for the decision.</p>
+<p>If the code is already self-explanatory and no explanation is needed, consider removing the comment instead.</p>
+</div>
+</div>
+</section>
+</section>
+<section id="recording-your-session-information" class="level2" data-number="10.4">
+<h2 data-number="10.4" class="anchored" data-anchor-id="recording-your-session-information"><span class="header-section-number">10.4</span> Recording your session information</h2>
+<p>Good scientific practice means recording which software versions produced your results. R and its packages are updated over time, and changes between versions can affect how code behaves.</p>
+<p>The following code saves the details of your current R session in the project rather than only printing them to the Console:</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Create the output folders if they do not already exist.</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="fu">dir.create</span>(<span class="st">"results"</span>, <span class="at">showWarnings =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="fu">dir.create</span>(</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">file.path</span>(<span class="st">"results"</span>, <span class="st">"tables"</span>),</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">recursive =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">showWarnings =</span> <span class="cn">FALSE</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Record the R, operating-system, and loaded-package versions used.</span></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="fu">writeLines</span>(<span class="st">"tables/sessionInfo.txt"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>tables/sessionInfo.txt</code></pre>
+</div>
+</div>
+<p>Open <code>tables/sessionInfo.txt</code> and inspect its contents. It records your R version, operating system, and the version of every package loaded in the current session.</p>
+<div class="callout callout-style-default callout-note callout-titled" title="What else should be recorded?">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>What else should be recorded?
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Software versions are only one part of reproducibility. You should also be able to identify:</p>
+<ul>
+<li><strong>inputs:</strong> the files or objects used</li>
+<li><strong>parameters:</strong> thresholds, factor levels, and non-default settings</li>
+<li><strong>processing:</strong> the steps applied and their order</li>
+<li><strong>outputs:</strong> the files, tables, and figures produced</li>
+<li><strong>decisions:</strong> exclusions, transformations, and analytical choices</li>
+</ul>
+</div>
+</div>
+<div class="callout callout-style-default callout-important callout-titled" title="Reproducibility check">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Important</span>Reproducibility check
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Restart R in RStudio using <strong>Session &gt; Restart R</strong>, and then run your script from the beginning, in order, with no earlier objects left in the Environment pane.</p>
+<p>A reproducible workflow must not silently depend on objects created in an earlier session. If something fails, that is useful information. It means a later step depends on something that has not been created or loaded by the script.</p>
+</div>
+</div>
+</section>
+<section id="sharing-projects-responsibly-with-github" class="level2" data-number="10.5">
+<h2 data-number="10.5" class="anchored" data-anchor-id="sharing-projects-responsibly-with-github"><span class="header-section-number">10.5</span> Sharing projects responsibly with GitHub</h2>
+<p><strong>Git</strong> is a version-control system that records changes to files. <strong>GitHub</strong> is an online service that can store Git repositories and support sharing and collaboration.</p>
+<p>For this session, the aim is not to learn every Git feature. The focus is on three practical ideas:</p>
+<ol type="1">
+<li>keeping a history of changes to analysis code</li>
+<li>sharing code and documentation</li>
+<li>preventing sensitive data from being added to a repository</li>
+</ol>
+<p>A bioinformatics repository might contain:</p>
+<ul>
+<li>R scripts</li>
+<li>Quarto or R Markdown files</li>
+<li>a <code>README.md</code> file</li>
+<li>small, non-sensitive example data where sharing is permitted</li>
+<li>figures or tables, where appropriate</li>
+</ul>
+<p>A public repository should not contain:</p>
+<ul>
+<li>identifiable or confidential patient data</li>
+<li>files that you do not have permission to share</li>
+<li>passwords, access tokens, or other credentials</li>
+<li>assessment material that should not be made public</li>
+</ul>
+<div class="callout callout-style-default callout-warning callout-titled" title="Data protection and research ethics">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>Data protection and research ethics
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The sample data used in this activity are derived from patients. Do not upload the sample data to GitHub.</p>
+<p>Whether research data can be shared depends on matters such as consent, identifiability, ethical approval, data-sharing agreements, and University policy. A file being technically easy to upload does not mean that uploading it is permitted.</p>
+<p>Consult the University of Glasgow guidance when working with research data:</p>
+<ul>
+<li><a href="https://www.gla.ac.uk/myglasgow/dpfoioffice/guidanceforstaffandstudents/" target="_blank" rel="noopener noreferrer">Data protection and freedom of information guidance for staff and students</a></li>
+<li><a href="https://www.gla.ac.uk/research/strategy/ourpolicies/ethics/" target="_blank" rel="noopener noreferrer">Research ethics policy and guidance</a></li>
+</ul>
+</div>
+</div>
+<section id="use-.gitignore-to-exclude-files" class="level3" data-number="10.5.1">
+<h3 data-number="10.5.1" class="anchored" data-anchor-id="use-.gitignore-to-exclude-files"><span class="header-section-number">10.5.1</span> Use <code>.gitignore</code> to exclude files</h3>
+<p>A <code>.gitignore</code> file tells Git which files and folders it should not track. You will be provided with a <code>.gitignore</code> file for the course project.</p>
+<p>It will include rules similar to these:</p>
+<pre class="text"><code># Do not track the folder containing patient-derived sample data.
+data/
+
+# Do not track common R workspace files.
+.Rhistory
+.RData
+
+# Do not track operating-system files.
+.DS_Store
+Thumbs.db</code></pre>
+<p>The <code>data/</code> rule prevents files inside that folder from being added to Git. The other rules exclude local files that are not needed to reproduce the analysis.</p>
+<div class="callout callout-style-default callout-important callout-titled" title="Important limitation">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Important</span>Important limitation
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>A <code>.gitignore</code> file helps prevent files from being added accidentally, but it is not a security system.</p>
+<p>If sensitive data have already been committed, adding the file to <code>.gitignore</code> does not remove the data from the repository’s earlier history. Check what will be committed before publishing or sharing a repository.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Discussion: what should be shared?">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Discussion: what should be shared?
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>For each item below, discuss whether it would normally be appropriate to upload it to a <strong>public</strong> GitHub repository:</p>
+<ul>
+<li>analysis scripts</li>
+<li>Quarto files</li>
+<li>a README file</li>
+<li>processed summary figures</li>
+<li>raw patient data</li>
+<li>metadata containing personal identifiers</li>
+<li>a password or access token used by a script</li>
+</ul>
+<p>What additional information would you need before deciding? There may not be one answer that applies to every project.</p>
+</div>
+</div>
+</section>
+<section id="install-github-desktop" class="level3" data-number="10.5.2">
+<h3 data-number="10.5.2" class="anchored" data-anchor-id="install-github-desktop"><span class="header-section-number">10.5.2</span> Install GitHub Desktop</h3>
+<p><a href="https://desktop.github.com/" target="_blank" rel="noopener noreferrer">GitHub Desktop</a> provides a graphical interface for Git and is available for Windows and macOS.</p>
+<ol type="1">
+<li>Download and install GitHub Desktop.</li>
+<li>Open it and sign in with your GitHub account, or create an account if required.</li>
+<li>Clone the course repository using the URL provided by your instructor.</li>
+<li>Choose a suitable location for the repository on your computer.</li>
+<li>Open the repository folder and identify the analysis files, <code>data/</code> folder, and <code>results/</code> folder.</li>
+<li>In GitHub Desktop, inspect the repository and confirm that the patient-derived files inside <code>data/</code> are not listed as changes to be committed.</li>
+</ol>
+<div class="callout callout-style-default callout-note callout-titled" title="Git, GitHub, and GitHub Desktop">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Git, GitHub, and GitHub Desktop
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ul>
+<li><strong>Git</strong> tracks changes to files on your computer.</li>
+<li><strong>GitHub</strong> can store and share a copy of a Git repository online.</li>
+<li><strong>GitHub Desktop</strong> provides buttons and menus for common Git operations.</li>
+</ul>
+<p>You can use Git without GitHub, and you can interact with GitHub without using the command line.</p>
+</div>
+</div>
+</section>
+<section id="make-one-small-meaningful-commit" class="level3" data-number="10.5.3">
+<h3 data-number="10.5.3" class="anchored" data-anchor-id="make-one-small-meaningful-commit"><span class="header-section-number">10.5.3</span> Make one small, meaningful commit</h3>
+<p>Make a small improvement to a comment or to the project README. In GitHub Desktop:</p>
+<ol type="1">
+<li>inspect the changed file before committing it</li>
+<li>confirm that no data files are included</li>
+<li>write a short commit summary describing the change, for example, <code>Clarify count filtering decision</code></li>
+<li>commit the change to the repository</li>
+</ol>
+<p>A commit records a meaningful point in the history of the project. Short, specific commit messages are more useful than messages such as <code>changes</code> or <code>update</code>.</p>
+</section>
+</section>
+<section id="r-catch-up-quick-review" class="level2" data-number="10.6">
+<h2 data-number="10.6" class="anchored" data-anchor-id="r-catch-up-quick-review"><span class="header-section-number">10.6</span> R catch-up: quick review</h2>
+<p>Before moving on to more advanced topics, let’s make sure some R fundamentals from earlier chapters have properly stuck.</p>
+<div class="callout callout-style-default callout-tip callout-titled" title="Try it yourself: quick review">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Try it yourself: quick review
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Without looking back at earlier chapters, answer these from memory, then check your answers against your own earlier code:</p>
+<ol type="1">
+<li>What is the difference between <code>count_data[1, ]</code> and <code>count_data[, 1]</code>?</li>
+<li>Why do we convert <code>sample_info$status</code> to a factor before analysis and plotting?</li>
+<li>What does <code>match(x, table)</code> return?</li>
+<li>In a <code>ggplot2</code> call, what is the difference between putting <code>colour = status</code> inside <code>aes()</code> and writing <code>colour = "blue"</code> outside <code>aes()</code>?</li>
+<li>Why do we always check that metadata and count-matrix samples are aligned before running a statistical test?</li>
+</ol>
+<div class="callout callout-style-default callout-tip callout-titled" title="Solution">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-11-contents" aria-controls="callout-11" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Solution
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-11" class="callout-11-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<ol type="1">
+<li><code>count_data[1, ]</code> extracts the first <strong>row</strong>: one gene and all samples. <code>count_data[, 1]</code> extracts the first <strong>column</strong>: one sample and all genes.</li>
+<li>Converting <code>status</code> to a factor with an explicit level order controls the ordering of groups in tables, legends, plots, and statistical models. It can also define the reference group used by a model.</li>
+<li><code>match(x, table)</code> returns, for each element of <code>x</code>, the position of its first match in <code>table</code>, or <code>NA</code> if no match is found.</li>
+<li>Inside <code>aes()</code>, <code>colour = status</code> maps the <code>status</code> column to colour and creates a legend. Outside <code>aes()</code>, <code>colour = "blue"</code> applies one fixed colour to every point and does not create a mapping.</li>
+<li>DESeq2, PCA, clustering, and plots assume that row <em>i</em> of the metadata and column <em>i</em> of the count matrix describe the same sample. A mismatch could produce technically valid output that describes the wrong biology.</li>
+</ol>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section id="common-errors-and-how-to-read-them" class="level2" data-number="10.7">
+<h2 data-number="10.7" class="anchored" data-anchor-id="common-errors-and-how-to-read-them"><span class="header-section-number">10.7</span> Common errors and how to read them</h2>
+<div class="callout callout-style-default callout-tip callout-titled" title="Troubleshooting">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Troubleshooting
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong><code>object 'x' not found</code></strong><br>
+You tried to use an object before creating it, or you ran chunks out of order. Rerun the script from the top and locate where the object should first be created.</p>
+<p><strong><code>non-numeric argument to binary operator</code></strong><br>
+You tried to perform arithmetic on something that is not numeric. Inspect the object with <code>class()</code>, <code>str()</code>, or <code>glimpse()</code> before changing it.</p>
+<p><strong><code>replacement has X rows, data has Y</code></strong><br>
+You tried to insert a vector of the wrong length into a data-frame column. Check that the right-hand side contains one value per row.</p>
+<p><strong>A plot is blank or contains no points</strong><br>
+Check that the columns mapped inside <code>aes()</code> exist and contain the expected values. Inspect the data supplied to <code>ggplot()</code> using <code>head()</code>, <code>str()</code>, or <code>summary()</code>.</p>
+<p><strong>DESeq2 reports a problem with the design formula</strong><br>
+Check that the variable named in <code>design = ~ status</code> exists in <code>colData(dds)</code>, is encoded appropriately, and contains the groups and replication expected for the analysis.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-note callout-titled" title="A structured troubleshooting habit">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>A structured troubleshooting habit
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>When an error occurs:</p>
+<ol type="1">
+<li>read the complete error message</li>
+<li>identify the line or chunk that failed</li>
+<li>inspect the objects used on that line</li>
+<li>check their names, classes, dimensions, and contents</li>
+<li>make one change at a time, then rerun the relevant code</li>
+</ol>
+<p>Do not repeatedly rerun the same command without investigating what the message is telling you.</p>
+</div>
+</div>
+</section>
+<section id="peer-review" class="level2" data-number="10.8">
+<h2 data-number="10.8" class="anchored" data-anchor-id="peer-review"><span class="header-section-number">10.8</span> Peer review</h2>
+<div class="callout callout-style-default callout-important callout-titled" title="Peer review">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Important</span>Peer review
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Exchange one figure and its associated code with a partner. Without you explaining it verbally, can they identify:</p>
+<ul>
+<li>the input data and any filtering applied</li>
+<li>the transformation used, such as raw, normalised, or VST</li>
+<li>the groups being compared</li>
+<li>any significance thresholds</li>
+<li>the conclusion supported by the figure</li>
+<li>the code and package used to create it</li>
+<li>any settings or decisions that would be needed to reproduce it</li>
+</ul>
+<p>Then inspect the code itself. Are the comments useful and concise? Can your partner distinguish what the code does from why important decisions were made?</p>
+<p>If something is unclear, add the missing information to the code, caption, or README. The aim is clearer communication, not extra decoration.</p>
+</div>
+</div>
+</section>
+<section id="optional-challenge-git-from-the-command-line" class="level2" data-number="10.9">
+<h2 data-number="10.9" class="anchored" data-anchor-id="optional-challenge-git-from-the-command-line"><span class="header-section-number">10.9</span> Optional challenge: Git from the command line</h2>
+<p>This activity introduces the commands behind the actions performed by GitHub Desktop. It is optional and does not require you to publish anything to GitHub.</p>
+<p>Open a terminal in the course project folder. On Windows, you can use <strong>Git Bash</strong>, which is installed with Git for Windows. On macOS, you can use <strong>Terminal</strong>.</p>
+<p>First, check whether the folder is already a Git repository:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> status</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>If you are working in a new practice folder rather than the cloned course repository, initialise it:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> init</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Inspect the current status:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> status</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Add one non-sensitive analysis or documentation file to the staging area:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> add analysis.R</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Check the status again:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> status</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Create a commit:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb15"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> commit <span class="at">-m</span> <span class="st">"Add initial analysis script"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Inspect the short commit history:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb16"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> log <span class="at">--oneline</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>To check whether a path is excluded by <code>.gitignore</code>, use:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb17"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> check-ignore <span class="at">-v</span> data/example_counts.csv</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="callout callout-style-default callout-warning callout-titled" title="Do not force-add the data">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>Do not force-add the data
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Do not use <code>git add -f</code> to override the <code>.gitignore</code> rules for patient-derived data. The purpose of this exercise is to see how Git prevents those files from entering the repository.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Optional challenge questions">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Optional challenge questions
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ol type="1">
+<li>What changed in the output of <code>git status</code> after <code>git add analysis.R</code>?</li>
+<li>What information was recorded by the commit?</li>
+<li>Which <code>.gitignore</code> rule applies to the example data file?</li>
+<li>How do GitHub Desktop’s <strong>Changes</strong>, <strong>Summary</strong>, and <strong>Commit</strong> controls correspond to the commands you used?</li>
+</ol>
+</div>
+</div>
+<p>You are not expected to become a Git expert during this course. The goal is to recognise the basic workflow and understand how version control can support reproducible research.</p>
+</section>
+<section id="summary" class="level2" data-number="10.10">
+<h2 data-number="10.10" class="anchored" data-anchor-id="summary"><span class="header-section-number">10.10</span> Summary</h2>
+<p>You have now:</p>
+<ul>
+<li>considered what another person needs in order to reproduce an analysis</li>
+<li>practised writing comments that explain purpose and decisions</li>
+<li>identified information that belongs in comments or a README</li>
+<li>recorded your R session information</li>
+<li>rerun your analysis from a clean session to check for hidden dependencies</li>
+<li>considered what should and should not be shared in a public repository</li>
+<li>used <code>.gitignore</code> to exclude patient-derived sample data</li>
+<li>made a small commit using GitHub Desktop</li>
+<li>revisited core R concepts and common errors</li>
+<li>reviewed a piece of work for reproducibility and clear communication</li>
+</ul>
+<p>In the next chapter, we return to the analysis and look for patterns <em>among genes</em> using clustering.</p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    // Ensure there is a toggle, if there isn't float one in the top right
+    if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+      const a = window.document.createElement('a');
+      a.classList.add('top-right');
+      a.classList.add('quarto-color-scheme-toggle');
+      a.href = "";
+      a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+      const i = window.document.createElement("i");
+      i.classList.add('bi');
+      a.appendChild(i);
+      window.document.body.appendChild(a);
+    }
+    setColorSchemeToggle(hasAlternateSentinel())
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+<nav class="page-navigation">
+  <div class="nav-page nav-page-previous">
+      <a href="./chapter09.html" class="pagination-link" aria-label="Customising Data Visualisations">
+        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text"><span class="chapter-number">9</span>&nbsp; <span class="chapter-title">Customising Data Visualisations</span></span>
+      </a>          
+  </div>
+  <div class="nav-page nav-page-next">
+      <a href="./chapter11.html" class="pagination-link" aria-label="Pattern discovery, hierarchical clustering and heatmaps">
+        <span class="nav-page-text"><span class="chapter-number">11</span>&nbsp; <span class="chapter-title">Pattern discovery, hierarchical clustering and heatmaps</span></span> <i class="bi bi-arrow-right-short"></i>
+      </a>
+  </div>
+</nav>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

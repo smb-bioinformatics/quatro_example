@@ -1,0 +1,3 @@
+"file","path","rows","columns","missing_values","md5","working_directory","date","r_version"
+"counts","m_sample_counts.csv",65217,21,0,"45d67c62ebbe5fcb650e0cf3be023778","C:/Users/Paul Capewell/OneDrive - University of Glasgow/Teaching/L4 Bioinformatics/new_tutorials/quarto_workbook","2026-09-15","R version 4.6.1 (2026-06-24 ucrt)"
+"metadata","m_sample_info.csv",21,4,0,"6f74e97841eca9957495173e1972616c","C:/Users/Paul Capewell/OneDrive - University of Glasgow/Teaching/L4 Bioinformatics/new_tutorials/quarto_workbook","2026-09-15","R version 4.6.1 (2026-06-24 ucrt)"

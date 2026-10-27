@@ -1,0 +1,491 @@
+<style>
+  .tooltip-text {
+    text-decoration: underline dotted #4a5568 2px; /* Dotted line under the word */
+    text-underline-offset: 3px;                     /* Gives space between text and line */
+    cursor: help;                                  /* Changes mouse pointer to a '?' cursor */
+    background-color: #f7fafc;                     /* Optional subtle background highlight */
+    padding: 0 2px;
+    border-radius: 2px;
+  }
+  
+  .tooltip-text:hover {
+    background-color: #e2e8f0;                     /* Highlight on mouseover */
+  }
+</style>
+
+<link rel="stylesheet" href="https://unpkg.com/tippy.js@6/themes/light.css" />
+
+# Sample-Level Summaries and Visualisation
+
+## What you'll learn
+
+In [Chapter 2](chapter02.qmd), we imported the RNA-seq count data and sample information, checked that the samples were correctly aligned and learned how to select values from these objects.
+
+In this chapter, you will use those skills to calculate a single summary value for each sample. You will combine these summaries with the sample information and create your first plot using `ggplot2`. This provides an initial comparison of sequencing depth across samples before differential-expression analysis.
+
+::: {.callout-note title="Learning outcomes"}
+By the end of this chapter, you should be able to:
+
+- calculate the total number of counts in each sample using `colSums()`
+- combine sample identifiers, biological information and calculated values in a data frame
+- create a basic bar chart using `ggplot2`
+- explain how layers are added to a `ggplot2` plot
+- interpret differences in library size as an initial quality-control measure
+- save a plot to the project output folders
+- calculate and interpret the proportion of genes with zero counts in one sample
+
+**ISCB alignment:** B3 (prepare and summarise life-science data for computational analysis), D3 (use a sample-level summary to identify data that may require further investigation), E3 (manage derived tables and figures within a reproducible folder structure), F3 (interpret library-size differences in their biological and technical context), H3 (use basic R functions, construct data frames and create plots using ggplot2).
+:::
+
+## Continuing the analysis from Chapter 2
+
+Open the same RStudio Project and the `HAT_analysis.R` script used in Chapter 2. Add the new code from this chapter below your existing code so that the script remains a reproducible record of the analysis.
+
+If you have restarted R, rerun your script from the beginning. This should ensure that `count_data` and `sample_info` are loaded and have the correct object types.
+
+::: {.callout-tip collapse="true" title="Recap: Essential setup code"}
+The following code recreates the objects needed in this chapter. You should already have most of it in your script from Chapter 2.
+
+```{r}
+#| label: setup
+#| message: false
+#| warning: false
+
+# Import sample information
+sample_info <- read.csv(
+  "m_sample_info.csv",
+  header = TRUE,
+  row.names = 1
+)
+
+# Import counts and convert them to a numeric matrix
+count_data <- read.csv(
+  "m_sample_counts.csv",
+  header = TRUE,
+  row.names = 1
+)
+
+count_data <- as.matrix(count_data)
+```
+:::
+
+## Sample quality metrics
+
+Before differential-expression analysis, we will calculate the total number of counts in each sample. This provides an initial overview of sequencing depth and can identify samples with substantially more or fewer counts than the others. It does not determine whether a sample should be removed, but it can identify samples that merit further investigation.
+
+**Garbage In, Garbage Out**
+
+### Creating a sample-summary table
+
+We already have the information needed to create sample-level summaries, but it is spread across two objects:
+
+- `count_data` contains the gene counts for each sample
+- `sample_info` contains information describing each sample
+
+We can use indexing and subsetting to combine selected information from these objects into a new <span class="tooltip-text" data-tippy-content="A data frame is how R stores data in a table, with observations in rows and variables in columns, where each column can contain a different type of information (e.g. numbers, words, letters.)">data frame</span> called `sample_summary`.
+
+In this new table:
+
+- each **row** will represent one sample
+- each **column** will contain a different piece of information about that sample
+
+Because the rows of `sample_info` are already in the same order as the columns of count_data, the first total count can be safely combined with the first metadata row, the second with the second, and so on. This is why it was important to check the order was identical.
+
+**Calculate the sample summaries**
+
+First, we will calculate the total number of counts in each sample.
+
+#### Total counts
+
+Because each column of `count_data` represents one sample, we can use the R function `colSums()` to calculate the total number of counts in each sample and store it as a vector (a vector is just a collection of values stored in a particular order):
+
+```{r}
+total_counts <- colSums(count_data)
+total_counts
+```
+
+In this analysis, we will use the total assigned count for each sample as its **library size**. Library size is important because samples with more counts generally provide more information about gene expression than samples with fewer counts. Large differences between samples may reflect differences in sequencing depth or sample quality, so library size is an important measure to examine before further analysis.
+
+**Create the new data frame**
+
+We can now use the `data.frame()` function to combine the sample information and calculated summaries:
+
+```{r}
+sample_summary <- data.frame(
+  sample_id = colnames(count_data),
+  status = sample_info$status,
+  total_counts = total_counts
+)
+```
+
+The `data.frame()` function combines values of equal length to create a table. Each named argument creates one column:
+
+- `sample_id` contains the sample identifiers
+- `status` contains the experimental status
+- `total_counts` contains the library size
+
+Because we previously confirmed that:
+
+```r
+identical(
+  rownames(sample_info),
+  colnames(count_data)
+)
+```
+
+returned `TRUE`, the status values are in the same order as the count summaries.
+
+**Inspect the summary table**
+
+Display the first few rows:
+
+```{r}
+head(sample_summary)
+```
+
+You should see one row per sample and three columns:
+
+- `sample_id`
+- `status`
+- `total_counts`
+
+::: {.callout-warning title="Check your work"}
+
+The number of rows in `sample_summary` should equal the number of sample columns in `count_data`:
+
+```{r}
+nrow(sample_summary) == ncol(count_data)
+```
+
+The result should be `TRUE`.
+
+:::
+
+**Save the summary table**
+
+The `sample_summary` object currently exists in the R Environment. We can also save it as a CSV file to the tables folder:
+
+```{r}
+write.csv(
+  x = sample_summary,
+  file = "tables/sample_summary.csv",
+  row.names = FALSE
+)
+```
+
+## Visualising data quality
+
+Visualisations can reveal differences between samples that are difficult to appreciate from tables of numbers. This can be an important quality assessment method to help spot issues before an analysis. We will be creating plots using the `ggplot2` package ([https://ggplot2.tidyverse.org](https://ggplot2.tidyverse.org/)) but first we have to load the package. To ensure this happens every time, we can add the `library()` call to the top of the script:
+
+```{r}
+library(ggplot2)
+```
+
+`ggplot2` uses a concept of layers that allows us to build up plots using a uniform language. We can start with the data and basic chart type, then add labels, colours and other visual improvements as we go on.
+
+To begin with, let's compare the total number of counts in each sample. This can provide an initial indication of sequencing depth and samples with substantially higher or lower total counts may need further investigation.
+
+### Creating a basic bar chart
+
+```{r}
+library_size_plot <- ggplot(
+  sample_summary,
+  aes(x = sample_id, y = total_counts)
+) +
+  geom_col()
+```
+
+This code creates a plot and saves it as an R object called `library_size_plot`. Saving the plot as an object allows us to display it, modify it and save it as an image later. You can run the object name to display the plot:
+
+```{r}
+library_size_plot
+```
+
+The plot has three main components:
+
+- `ggplot(sample_summary, ...)` specifies the <span class="tooltip-text" data-tippy-content="A data frame is how R stores data in a table, with observations in rows and variables in columns, where each column can contain a different type of information (e.g. numbers, words, letters.)">data frame</span> containing the data
+- `aes(x = sample_id, y = total_counts)` maps the sample identifiers and total counts to the plot axes
+- `geom_col()` draws one bar for each sample
+
+The sample names are difficult to read along the horizontal axis, so we can add a `coord_flip()` layer to turn the plot sideways:
+
+
+```{r}
+library_size_plot <- ggplot(
+  sample_summary,
+  aes(x = sample_id, y = total_counts)
+) +
+  geom_col() +
+  coord_flip()
+  
+library_size_plot
+```
+::: {.callout-note}
+When building up ggplot layers, the `+` must appear at the end of the preceding line so R knows the plot statement continues. 
+
+:::
+
+The existing plot is updated and the new version is saved back into `library_size_plot`. This changes how the values are displayed but does not change the data in `sample_summary`.
+
+How would you interpret the plot? Compare your interpretation with a partner:
+
+- What are two possible reasons why a sample might have fewer total counts or a smaller library size?
+- Does a lower value necessarily mean that the sample is poor quality?
+  What additional information would you want before excluding it?
+
+### Saving the bar chart
+
+The plot currently exists as an object in the R Environment. To use the plot outside R, we can save it as an image using the `ggsave()` function. We need to specify the filename (including the `figures` output directory) and the plot we want to save:
+
+```r
+ggsave(
+  filename = "figures/total_counts_per_sample.png",
+  plot = library_size_plot
+)
+```
+
+Check that the image is in the right place in your project folder:
+
+```text
+HAT_analysis/
+
+└── figures/
+      └── total_counts_per_sample.png
+```
+
+## How many genes have zero counts?
+
+The library-size figure compares the total counts across samples. However, each total combines counts from thousands of genes. We will now look within a single sample to see what this summary hides.
+
+A sample can have a large total count even if many of its genes have no recorded counts. We will therefore look within one sample and ask how many genes have a count of zero.
+
+Remember that `count_data` contains genes in rows and samples in columns. First, we'll use indexing and subsetting to select all the gene counts from sample "h1.1" and store them in a new vector called `sample_h1_1_counts `:
+
+```{r}
+sample_h1_1_counts <- count_data[, "h1.1"]
+head(sample_h1_1_counts)
+```
+
+In `count_data[, "h1.1"]`, the empty position before the comma selects **all genes**, while `"h1.1"` selects just that one sample.
+
+:::{.callout-tip title="Try it yourself: Make a prediction"}
+
+Before continuing, discuss these questions with a partner.
+
+1. Do you expect every gene to have at least one count?
+2. Why might some genes have zero counts?
+3. Does a count of zero necessarily mean that the gene is never expressed?
+4. Would you expect every sample to have zero counts for exactly the same genes?
+
+:::
+
+:::{.callout-note collapse="true" title="Possible answer"}
+
+1. No. Many genes are expressed only in particular cells, life stages or biological conditions.
+2. A gene may be inactive in the sampled material, expressed at a very low level, or affected by limitations in sampling, mapping or annotation.
+3. No. A zero means that no counts were recorded for that gene in this sample. The gene may be expressed elsewhere or at a level too low to detect.
+4. No. Biological differences and technical variation can produce different sets of zero-count genes among samples.
+
+:::
+
+### Identify zero-count genes
+
+We can test every gene count in `sample_h1_1_counts` to determine whether its count is equal to zero using the equality operator (`==`). The comparison is performed separately for every gene. It produces `TRUE` when a gene has zero counts and `FALSE` when it has a non-zero count. These logical values are stored in a vector called `is_zero_count`.
+
+```{r}
+is_zero_count <- sample_h1_1_counts == 0
+head(is_zero_count)
+```
+
+We can count the `TRUE` values using `sum()` and store the value in `number_zero_count_genes` using:
+
+```{r}
+number_zero_count_genes <- sum(is_zero_count)
+number_zero_count_genes
+```
+
+There are 65,217 genes in the dataset **but** we can make the code more reproducible by obtaining this value from count_data rather than hard-coding it. Because genes are stored in rows `nrow(count_data)` returns the total number of genes:
+
+```{r}
+(number_zero_count_genes  / nrow(count_data)) * 100
+```
+
+:::{.callout-tip title="Try it yourself: Interpret the result"}
+
+1. What percentage of genes have zero counts?
+2. Is this higher or lower than you predicted?
+3. What biological and technical explanations could account for these zeros?
+4. Why should we avoid concluding that every zero-count gene is biologically inactive?
+
+:::
+
+:::{.callout-tip collapse="true" title="Possible answers"}
+
+1. Approximately **55.1%** of genes have zero counts **in this sample**:
+
+2. Your answer will depend on your prediction. More than half of the genes have zero counts.
+
+3. Biologically, some genes may be inactive in the sampled cells or condition. Technically, zero counts can also result from very low expression, limited sampling, unsuccessful mapping or incomplete annotation.
+
+4. A zero means that no counts were recorded for that gene in this sample. It does not prove that the gene is never expressed. It may be expressed in another cell type or condition, or at a level too low to detect.
+
+:::
+
+**What does this summary hide?**
+
+The percentage tells us how many genes have zero counts, but it does not show how the remaining counts are distributed. It does not distinguish between non-zero counts such as:
+
+```text
+1, 10, 100, 1,000 or 10,000
+```
+
+RNA-seq counts can span a very wide range, making their complete distribution difficult to display on an ordinary linear scale.
+
+In the next chapter, we will learn how a mathematical transformation can make this distribution easier to visualise.
+
+## Summary
+
+In this chapter, you calculated the total number of counts in each sample and combined these values with sample identifiers and biological information in a new data frame.
+
+You then used `ggplot2` to create a bar chart comparing library sizes across samples. This plot provides an initial way to identify samples that may require further investigation, but library size alone is not sufficient evidence for removing a sample.
+
+In this chapter, you:
+
+- used `colSums()` to calculate one total for each sample
+- created a sample-level summary table using `data.frame()`
+- mapped data-frame columns to plot axes using `aes()`
+- created a bar chart using `geom_col()`
+- added a layer to improve how the plot was displayed
+- distinguished between changing the appearance of a plot and changing its underlying data
+- used a logical comparison and `sum()` to calculate the number of genes with zero counts in a single sample
+- considered biological and technical explanations for zero-count genes
+
+In Chapter 4, you will transform and reshape a copy of the count data so that you can compare the distribution of counts across samples. You will then combine this evidence with the library-size plot to investigate whether any samples require further attention.
+
+## Optional extra activities
+
+You have now completed the required activities for this chapter. The remaining activities are **optional** but valuable opportunities for further practice. You can attempt them now or return to them later.
+
+::: {.callout-tip title="Optional Activity 1: Find the samples with the largest and smallest library sizes"}
+
+The **library size** of an RNA-seq sample is the total number of counts recorded for that sample. In our summary table, library size is stored in the `total_counts` column.
+
+Samples with larger library sizes have more counts available for analysis. However, a larger library size does not necessarily mean that a sample is of higher quality. Library size is only one of several quality-control measurements.
+
+Can you use subsetting to find the samples with the **largest and smallest library sizes**?
+
+The R functions `which.min()` and `which.max()` may be useful but it is important to note that they return the **position** of the smallest or largest value, not the sample name. We will have to do some subsetting and indexing to find that out.
+
+:::
+
+::: {.callout-tip title="One possible approach" collapse="true"}
+
+One approach is to save the positions before using them to subset `sample_summary`:
+
+```{r}
+index_min <- which.min(sample_summary$total_counts)
+index_max <- which.max(sample_summary$total_counts)
+
+sample_summary[index_min, c("sample_id", "total_counts")]
+sample_summary[index_max, c("sample_id", "total_counts")]
+```
+
+Alternatively, you can perform each operation in one expression:
+
+```{r}
+sample_summary[
+  which.min(sample_summary$total_counts),
+  c("sample_id", "total_counts")
+]
+
+sample_summary[
+  which.max(sample_summary$total_counts),
+  c("sample_id", "total_counts")
+]
+```
+
+:::
+
+::: {.callout-tip title="Optional Activity 2: Plot the number of detected genes"}
+
+The plot generated previously in the tutorial shows the total number of counts for each sample. Another useful summary is the number of genes with at least one count in each sample. We can add this information to our `sample_summary` table as a `detected_genes` column using logical operators.
+
+This can be a bit hard to follow so first we can use subsetting to examine a small part of the count <span class="tooltip-text" data-tippy-content="A matrix is how R stores data in a rectangular grid of rows and columns, where every value must be the same type, such as all numbers.">matrix</span>:
+
+```{r}
+count_data[1:6, 1:4]
+```
+
+Now we can use the `>` operator to test whether each count is greater than zero:
+
+```{r}
+count_data[1:6, 1:4] > 0
+```
+
+R returns:
+
+- `TRUE` when a count is greater than zero
+- `FALSE` when a count is zero 
+
+When logical values like these are used in a numerical calculation, R treats `TRUE` as `1` and `FALSE` as `0` so we can use `colSums()` to count the `TRUE` values in each sample column and store that as a vector:
+
+```{r}
+detected_genes <- colSums(count_data > 0)
+detected_genes
+```
+
+We can add this to `sample_summary` using:
+
+```{r}
+sample_summary$detected_genes <- detected_genes
+head(sample_summary)
+```
+
+A count greater than zero does not necessarily indicate strong or biologically meaningful expression. This is a simple sample-level summary.
+
+Next, try to modify the `ggplot` code from the tutorial to:
+
+1. create a new plot called `detected_genes_plot`
+2. display `detected_genes` on the y-axis
+3. show the completed plot
+4. save the plot as `figures/detected_genes_per_sample.png`
+
+After creating the plot, consider the following questions:
+
+1. What does each bar represent?
+2. Why might one sample have fewer detected genes than the others?
+3. Would this measurement alone be enough to justify removing a sample from the analysis?
+
+:::
+
+::: {.callout-tip title="One possible approach" collapse="true"}
+
+```{r}
+detected_genes_plot <- ggplot(
+  sample_summary,
+  aes(x = sample_id, y = detected_genes)
+) +
+  geom_col() +
+  coord_flip()
+
+detected_genes_plot
+```
+
+```{r}
+ggsave(
+  filename = "figures/detected_genes_per_sample.png",
+  plot = detected_genes_plot
+)
+```
+
+Each bar represents the number of genes with a non-zero count in one sample.
+
+A sample might have fewer detected genes because of lower sequencing depth, reduced library complexity, poorer RNA quality, or a genuine biological difference.
+
+This measurement alone is not sufficient to justify removing a sample. It should be considered alongside other quality-control measurements and the experimental metadata.
+
+:::
+
+<script>
+  tippy('[data-tippy-content]');
+</script>

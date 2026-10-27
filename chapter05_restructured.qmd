@@ -1,0 +1,734 @@
+<style>
+  .tooltip-text {
+    text-decoration: underline dotted #4a5568 2px; /* Dotted line under the word */
+    text-underline-offset: 3px;                     /* Gives space between text and line */
+    cursor: help;                                  /* Changes mouse pointer to a '?' cursor */
+    background-color: #f7fafc;                     /* Optional subtle background highlight */
+    padding: 0 2px;
+    border-radius: 2px;
+  }
+  
+  .tooltip-text:hover {
+    background-color: #e2e8f0;                     /* Highlight on mouseover */
+  }
+</style>
+<link rel="stylesheet" href="https://unpkg.com/tippy.js@6/themes/light.css" />
+
+# Preparing Data for Differential-Expression Analysis
+
+## What you'll learn
+
+In [Chapter 4](chapter04.qmd), you examined the distribution of gene counts within each sample. You created a log2(count + 1) transformed copy of the count matrix, reshaped it for plotting and compared the samples using boxplots. By combining this plot with the quality-control summaries from [Chapter 3](chapter03.qmd), you found no clear reason to exclude any samples *at this stage*.
+
+In this session, we'll ask whether gene expression differs between patients with symptomatic HAT and people classified as SERO TL+ (sometimes described as having latent infections). Remember, both groups are infected with trypanosome parasites but SERO TL+ individuals do not show an overt phenotype.
+
+We will prepare the counts and sample information for `DESeq2`, construct and inspect a `DESeqDataSet` and filter out low-count genes. The next chapter will fit the model and extract the differential-expression contrast.
+
+Before writing any code, it's important to consider the biology. Discuss the following questions with a partner before revealing the solution:
+
+1. What is the response being measured?
+2. What is the explanatory variable?
+3. What are the biological replicates?
+4. What comparison will HAT versus SERO TL+ make?
+5. What could this observational comparison show and what can it not establish?
+
+::: {.callout-tip collapse="true" title="Solution"}
+
+1. The response is the number of RNA-seq counts assigned to each gene in each sample. These *gene counts* provide a measure of gene expression.
+
+2. The explanatory variable is `status`, which places each biological sample into a group (hat, sero or ctrl).
+
+3. The biological replicates are the independently collected samples from different people within each group. Genes and sequencing reads are measurements taken from these samples, not additional biological replicates.
+
+4. It will compare gene expression in samples from the HAT group with gene expression in samples from the SERO TL+ group. For this comparison, a positive log2 fold change indicates higher estimated expression in HAT, while a negative log2 fold change indicates higher estimated expression in SERO.
+
+5. The analysis can identify genes whose expression is **associated with** HAT or SERO status in these samples. It cannot establish that status directly **caused** the differences in gene expression. Other biological or technical differences between the groups could also contribute to the observed pattern.
+
+:::
+
+::: {.callout-note}
+## Learning outcomes
+By the end of this chapter you should be able to:
+
+- verify that a count matrix and sample metadata are aligned
+- represent an experimental group as a <span class="tooltip-text" data-tippy-content="A factor is how R stores a variable made up of a fixed set of categories, such as biological groups. Unlike ordinary text, a factor tells R which categories exist so they can be used correctly in summaries, plots and statistical models.">factor</span> and inspect its levels
+- explain the roles of `countData`, `colData` and `design`
+- construct and inspect a `DESeqDataSet`
+- filter genes using a logical condition and verify the result
+- save the filtered `DESeqDataSet` so it can be reloaded in the next chapter
+
+**ISCB alignment:** **ISCB alignment:** A3 (relate the experimental design and biological replicates to the RNA-seq question), B3 (prepare, validate and filter count
+data and sample metadata for differential-expression analysis), D3 (use summaries and logical filtering appropriate to the data structure), E3 (document and save a reusable filtered analysis object), F3 (construct and inspect a `DESeqDataSet` using appropriate `DESeq2` functions), H3 (use R factors, subsetting and accessor functions to prepare analysis inputs).
+:::
+
+## Load the input data
+
+Load the count matrix and sample information at the start of the session so the workflow can be run after restarting R.
+```{r}
+count_data <- as.matrix(read.csv(
+  "m_sample_counts.csv", header = TRUE, row.names = 1, check.names = FALSE
+))
+sample_info <- read.csv(
+  "m_sample_info.csv", header = TRUE, row.names = 1, check.names = FALSE
+)
+```
+For this session we will be using the DESeq2 R package so we need to load it using the library() function. You can add this to the top of your script with the other package imports, or place it before the next code block.
+
+```{r}
+#| message: false
+#| warning: false
+library(DESeq2)
+```
+
+## Representing the biological groups as a factor
+
+In the HAT dataset, the **status** column contains the category labels `ctrl`, `sero` and `hat`. R can store these labels as ordinary text, but the statistical model needs to recognise that they represent distinct biological groups. We therefore have to convert status into a factor.
+
+A factor is how R stores a variable made up of a fixed set of categories, such as biological groups. Unlike ordinary text, a factor tells R which categories exist so they can be used correctly in summaries, plots and statistical models. 
+
+```{r}
+sample_info$status <- factor(
+  sample_info$status
+)
+
+levels(
+  sample_info$status
+)
+```
+
+::: {.callout-note title="Factor level order"}
+The order of <span class="tooltip-text" data-tippy-content="A factor is how R stores a variable made up of a fixed set of categories, such as biological groups. Unlike ordinary text, a factor tells R which categories exist so they can be used correctly in summaries, plots and statistical models.">factor</span> levels can affect how model coefficients are labelled. In this chapter, the direction of the biological comparison will be specified explicitly using a **contrast**, so we do not need to change the reference level to get the comparison we want.
+:::
+
+## Checking biological replication
+
+Before constructing the model, we should understand how many biological samples are available for each status. The number of samples matters because DESeq2 uses the differences among samples within the same group to estimate biological variability.
+
+Here, each column in the count matrix represents one biological sample. The genes and sequencing reads are measurements taken from those samples. They are not additional biological replicates.
+
+As in [Chapter 2](chapter02.qmd), we can use the `table()` function to summarise the status column in `sample_info` to show the number of samples in each group.
+
+```r
+table(sample_info$status)
+```
+
+::: {.callout-tip title="Try it yourself: Interpret group replication"}
+
+1. How many biological samples are in each group?
+2. Are the groups balanced?
+3. What is the replicate in this experiment: each gene, each read, or each person/sample?
+4. Why do 30,000 genes not compensate for having relatively few samples?
+5. Which group has the least information for estimating within-group variability?
+
+:::
+
+::: {.callout-tip collapse="true" title="Solution"}
+
+1. There are **6 CTRL samples, 9 HAT samples and 6 SERO TL+ samples**.
+
+2. The groups are **not completely balanced**, because they do not all contain the same number of samples. HAT has three more samples than either CTRL or SERO TL+. This difference does not prevent DESeq2 from performing the analysis.
+
+3. The biological replicates are the **independently collected people or samples** within each group. Each column of the count matrix represents one biological replicate. Genes and sequencing reads are measurements taken from those samples, not additional biological replicates.
+
+4. The approximately 30,000 genes are measured repeatedly in the same set of biological samples. They provide information about many different genes, but they do not provide 30,000 independent observations of the difference between HAT and SERO TL+. Additional biological samples would provide more information about how much expression varies among people within each group.
+
+5. CTRL and SERO TL+ have the fewest biological samples, with six each. For our planned **HAT-versus-SERO TL+ comparison**, SERO TL+ therefore provides less information about within-group variability than HAT. This may make estimates involving SERO TL+ less precise than they would be if more SERO TL+ samples were available.
+
+:::
+
+## Constructing the `DESeqDataSet`
+
+DESeq2 stores the information needed for differential expression analysis in an object called a `DESeqDataSet`. Keeping the information together helps ensure that the counts for each sample remain connected to the correct sample information and experimental design.
+
+A `DESeqDataSet` contains three connected components:
+
+- **countData** the RNA-seq counts as a matrix (genes in rows and samples in columns)
+- **colData** information describing the samples (samples in rows and variables in columns)
+- **design** = the sample variable or variables included in the model
+
+The **design formula** tells DESeq2 which sample variable should be included when explaining systematic differences in the counts.
+
+For this analysis, the design formula is:
+
+```r
+~ status
+```
+
+The tilde (`~`) introduces a model formula. Here, `~ status` tells `DESeq2` that the model should include differences associated with the levels of `status`.
+
+This design includes all three status groups. It does not yet specify which two groups we want to compare. We will request the HAT-versus-SERO TL+ comparison later using `results()`.
+
+
+### Complete the function call
+
+We can construct the `DESeqDataSet` object we need using the `DESeqDataSetFromMatrix()` helper function from `DESeq2`. 
+
+::: {.callout-tip title="Try it yourself: Complete the code"}
+
+How would you use each of the following options once to fill in the blanks and complete the statement to build a `DESeqDataSet` with our HAT dataset:
+
+```text
+count_data    sample_info    status
+```
+
+```r
+dds <- DESeqDataSetFromMatrix(
+  countData = __________,
+  colData = __________,
+  design = ~ __________
+)
+```
+
+Think about the type of information expected by each argument:
+
+- Which object contains the RNA-seq counts?
+- Which object describes the biological samples?
+- Which variable identifies the biological groups?
+
+:::
+
+::: {.callout-tip collapse="true" title="Solution"}
+
+```{r}
+dds <- DESeqDataSetFromMatrix(
+  countData = count_data,
+  colData = sample_info,
+  design = ~ status
+)
+```
+
+- `countData = count_data` supplies the matrix of gene counts.
+- `colData = sample_info` supplies the information describing each sample.
+- `design = ~ status` tells DESeq2 to include the biological status groups in the model.
+
+:::
+
+::: {.callout-warning title="Make sure to use the original counts"}
+
+DESeq2 uses the original integer counts. The `log2(count + 1)` values created in Chapter 4 were used only for visualisation and must not be supplied to the model.
+
+Make sure you are using `countData = count_data` and not the transformed `log_count_data`.
+
+:::
+
+Creating a `dds` object organises the counts, sample information and design into one object to make sure it is in a format ready for `DESeq2` to use. It has not yet fitted a statistical model or changed the original count values.
+
+## Check the information stored in `dds`
+
+After constructing the `dds` object, we should check that it contains the correct counts, sample information and design.
+
+`DESeq2` provides **accessor functions** for retrieving these components:
+
+- `counts()` retrieves the count matrix
+- `colData()` retrieves the sample information
+- `design()` retrieves the design formula
+
+We can use these functions to perform three brief checks before continuing.
+
+**Check the count matrix**
+
+The complete count matrix is large, so we will inspect only the first five genes and first four samples using the subsetting skills from [Chapter 2](chapter02.qmd):
+
+```{r}
+counts(dds)[1:5, 1:4]
+```
+
+This uses the same `[rows, columns]` indexing that you used with matrices in [Chapter 2](chapter02.qmd).
+
+::: {.callout-tip title="Try it yourself: Check the stored counts"}
+
+How could you check whether these values are identical to the corresponding values in the original `count_data` matrix?
+
+:::
+
+::: {.callout-tip collapse="true" title="Solution"}
+
+```{r}
+identical(
+  counts(dds)[1:5, 1:4],
+  count_data[1:5, 1:4]
+)
+```
+
+:::
+
+**Check the sample information**
+
+The `colData()` function retrieves the sample information stored in `dds`. `DESeq2` stores this information in a specialised table that we can convert to a familiar data frame:
+
+```{r}
+dds_sample_info <- as.data.frame(colData(dds))
+
+head(dds_sample_info)
+```
+
+::: {.callout-tip title="Try it yourself: Check the stored sample information"}
+
+Compare `dds_sample_info` with the original `sample_info` object.
+
+1. Do the sample names appear in the same order?
+2. Does each sample have the same `status` in both objects?
+3. Why would a difference in sample order be a serious problem?
+
+:::
+
+::: {.callout-tip collapse="true" title="Solution"}
+
+1. We can compare the row names of the two objects directly:
+
+```{r}
+identical(
+  rownames(dds_sample_info),
+  rownames(sample_info)
+)
+```
+
+   This should return `TRUE`, confirming that the sample names appear in the same order.
+
+2. We can compare the `status` values directly:
+
+```{r}
+identical(
+  as.character(dds_sample_info$status),
+  as.character(sample_info$status)
+)
+```
+
+This should return `TRUE`, confirming that each sample has the same `status` in both objects.
+
+3. The columns of the count matrix and the rows of the sample information must describe the same samples in the same order. If their order differed, a sample's counts could be associated with information from the wrong person. `DESeq2` could then compare incorrectly labelled biological groups.
+
+:::
+
+
+**Check the model design**
+
+Finally, use `design()` to retrieve the model formula stored in `dds`:
+
+```{r}
+design(dds)
+```
+
+This confirms that `status` is the sample variable included in the model. It does not yet specify the HAT-versus-SERO TL+ comparison. We will define that comparison when we retrieve the model results.
+
+These checks confirm that `dds` contains the expected count matrix, correctly aligned sample information and intended model design. We can now prepare the object for model fitting by removing genes with very little count information.
+
+## Apply a simple low-count filter
+
+Before fitting the model, we will apply a simple pre-filter to speed up the analysis. Genes with fewer than 10 counts in total across all samples provide little information for this comparison, and removing them reduces the size of the dataset. The code uses logical operators and row selection similar to those used to identify zero-count genes in sample `h1.1`.
+
+::: {.callout-note title="You do not need to memorise this code"}
+For now, focus on what the code does:
+
+- calculates the total count for each gene in the dataset
+-  identifies genes with a total count of at least 10
+- retains those gene rows.
+
+An optional activity later in this session unpacks each operation in more detail.
+:::
+
+```{r}
+# Calculate the total count for each gene across all samples
+gene_total <- rowSums(counts(dds))
+
+# Identify genes with at least 10 counts in total
+keep_gene <- gene_total >= 10
+
+# Retain the selected gene rows and all sample columns
+dds_filtered <- dds[keep_gene, ]
+```
+
+The expression used to filter `dds` follows the familiar indexing pattern:
+
+```text
+object[rows, columns]
+```
+
+In this case:
+
+- `keep_gene` appears before the comma, so it selects **gene rows**
+- nothing appears after the comma, so **all sample columns** are retained
+
+::: {.callout-tip title="Try it yourself: Check the result"}
+It is always good practice to check that a statement did what you expected. Run the following code:
+
+```{r}
+dim(dds)
+dim(dds_filtered)
+```
+
+Compare the two outputs and answer:
+
+1. Did the number of genes change?
+2. Did the number of samples change?
+3. Why did filtering affect the rows but not the columns?
+
+:::
+
+::: {.callout-tip collapse="true" title="Solution"}
+1. The number of genes decreased because genes with fewer than 10 total counts were removed.
+
+2. The number of samples did not change because the filter was applied to the rows.
+
+3. `keep_gene` appears before the comma, so it selects gene rows. Nothing appears after the comma, so all sample columns are retained.
+
+```r
+dds_filtered <- dds[keep_gene, ]
+```
+
+For this dataset, the dimensions should change from:
+
+```text
+65,217 genes × 21 samples
+```
+
+to:
+
+```text
+30,076 genes × 21 samples
+```
+
+Therefore, the filter removes:
+
+```{r}
+nrow(dds) - nrow(dds_filtered)
+```
+
+This should return `35141`.
+:::
+
+::: {.callout-warning title="What filtering does and does not mean"}
+This is a simple **pre-filter** based only on the total number of counts available for each gene.
+
+- Passing the filter does not mean that a gene is differentially expressed.
+- Passing the filter does not mean that a gene is strongly expressed in every sample.
+- Failing the filter does not mean that a gene has no biological importance.
+- Filtering does not transform or normalise the retained counts.
+- Filtering removes complete gene rows but retains all biological samples.
+
+The threshold of 10 is a simple threshold we are using to speed up analysis rather than a universal rule for every RNA-seq analysis.
+:::
+
+We will use the new `dds_filtered` object when fitting the model in the next chapter.
+
+## Save the prepared data
+
+The next chapter will reload the filtered `DESeqDataSet` from this file, so it is available after restarting R.
+
+```{r}
+saveRDS(
+  object = dds_filtered,
+  file = "objects/dds_filtered.rds"
+)
+```
+
+The count data, sample information and design have now been organised, checked and filtered. `saveRDS()` stores an exact copy of an R object in a file that we can reload with `readRDS()`, saving time in later chapters by not repeating the preparation steps.
+
+
+## Summary
+
+In this chapter, you:
+
+- considered the biological question and the limits of this observational comparison
+- identified the response, explanatory variable and biological replicates
+- represented biological groups as a factor and inspected its levels
+- constructed and checked a `DESeqDataSet`
+- applied and checked a simple low-count filter
+- saved `dds_filtered` for the next chapter
+
+[Chapter 6](chapter06_restructured.qmd) will reload `dds_filtered`, fit the DESeq2 model and interpret the HAT-versus-SERO TL+ results.  
+
+## Optional extra activities
+
+You have now completed the required activities for this chapter. The remaining section is an **optional, but valuable** challenge for further practice. You can attempt it now or return to it later.
+
+::: {.callout-tip title="Optional Activity 1: Investigate low-count filtering"}
+
+In the main workflow, we used the following code to remove genes with fewer than 10 counts in total across all samples:
+
+```r
+gene_total <- rowSums(counts(dds))
+keep_gene <- gene_total >= 10
+dds_filtered <- dds[keep_gene, ]
+```
+
+We can investigate how this filter works in more detail and check that it produced the expected result.
+
+Your code should:
+
+1. calculate the total count for each gene across all samples
+2. confirm that there is one value in `gene_total` for every gene in `dds`
+3. identify which genes have at least 10 counts in total
+4. count how many genes pass and fail the filter
+5. use the logical vector to retain the selected gene rows
+6. confirm that filtering changes the number of genes but not the number of samples
+7. confirm that the counts belonging to retained genes were not changed
+
+Use your results to answer the following questions:
+
+1. What does each value in `gene_total` represent?
+2. What does each value in `keep_gene` represent?
+3. What is the difference between `length(keep_gene)` and `sum(keep_gene)`?
+4. How many genes were removed by the filter?
+5. Why did the number of rows change while the number of columns remained the same?
+6. Does passing the filter mean that a gene is differentially expressed?
+7. Does failing the filter mean that a gene has no biological importance?
+
+### Further challenge
+
+Investigate what happens when the threshold is changed to 1, 20, 50 or 100.
+
+- How does increasing the threshold affect the number of retained genes?
+- Is the threshold that removes the most genes automatically the best threshold?
+- Why should a filtering threshold be selected independently of the desired statistical result?
+
+If you want to investigate the computational effect, use `system.time()` to compare how long `DESeq()` takes with the original and filtered objects.
+
+:::
+
+::: {.callout-tip title="Possible solution" collapse="true"}
+
+First, calculate the total count for each gene across all samples:
+
+```{r}
+gene_total <- rowSums(
+  counts(dds)
+)
+```
+
+`gene_total` contains one value per gene. Each value is the sum of that gene's counts across all 21 samples.
+
+Inspect the first few values:
+
+```{r}
+head(gene_total)
+```
+
+Confirm that there is one total for each gene:
+
+```{r}
+length(gene_total)
+nrow(dds)
+```
+
+These values should be identical:
+
+```{r}
+identical(
+  length(gene_total),
+  nrow(dds)
+)
+```
+
+This should return `TRUE`.
+
+Next, test each gene against the threshold:
+
+```{r}
+keep_gene <- gene_total >= 10
+```
+
+Each value in `keep_gene` is:
+
+- `TRUE` if the gene has at least 10 counts in total
+- `FALSE` if the gene has fewer than 10 counts in total
+
+Inspect the first few totals and decisions together:
+
+```{r}
+head(
+  data.frame(
+    gene_total = gene_total,
+    keep_gene = keep_gene
+  )
+)
+```
+
+Count how many genes pass and fail the filter:
+
+```{r}
+table(keep_gene)
+```
+
+We can also count the retained genes using:
+
+```{r}
+sum(keep_gene)
+```
+
+`length(keep_gene)` returns the total number of genes tested:
+
+```{r}
+length(keep_gene)
+```
+
+`sum(keep_gene)` returns only the number of genes that pass because R treats `TRUE` as 1 and `FALSE` as 0:
+
+```{r}
+sum(keep_gene)
+```
+
+The number of genes that fail can be calculated using either:
+
+```{r}
+length(keep_gene) - sum(keep_gene)
+```
+
+or:
+
+```{r}
+sum(!keep_gene)
+```
+
+Use the logical vector to retain the selected gene rows:
+
+```{r}
+dds_filtered <- dds[keep_gene, ]
+```
+
+This follows the familiar indexing pattern:
+
+```text
+object[rows, columns]
+```
+
+`keep_gene` appears before the comma, so it selects gene rows. Nothing appears after the comma, so all sample columns are retained.
+
+Compare the dimensions before and after filtering:
+
+```{r}
+dim(dds)
+dim(dds_filtered)
+```
+
+Before filtering, `dds` contains:
+
+```text
+65,217 genes × 21 samples
+```
+
+After filtering, `dds_filtered` contains:
+
+```text
+30,076 genes × 21 samples
+```
+
+Calculate the number of removed genes:
+
+```{r}
+nrow(dds) - nrow(dds_filtered)
+```
+
+This should return `35141`.
+
+Confirm that the number retained agrees with the logical vector:
+
+```{r}
+identical(
+  nrow(dds_filtered),
+  sum(keep_gene)
+)
+```
+
+Confirm that the number removed also agrees:
+
+```{r}
+identical(
+  nrow(dds) - nrow(dds_filtered),
+  sum(!keep_gene)
+)
+```
+
+Both checks should return `TRUE`.
+
+The number of samples should remain unchanged:
+
+```{r}
+identical(
+  ncol(dds),
+  ncol(dds_filtered)
+)
+```
+
+This should also return `TRUE`.
+
+To confirm that filtering did not alter the counts belonging to retained genes, select the same genes and samples from both objects:
+
+```{r}
+retained_gene_names <- rownames(dds_filtered)[1:5]
+
+original_subset <- counts(dds)[
+  retained_gene_names,
+  1:4
+]
+
+filtered_subset <- counts(dds_filtered)[
+  retained_gene_names,
+  1:4
+]
+```
+
+Compare the two subsets:
+
+```{r}
+identical(
+  original_subset,
+  filtered_subset
+)
+```
+
+This should return `TRUE`. Filtering removes complete gene rows but does not transform or normalise the retained counts.
+
+Passing the filter does not mean that a gene is differentially expressed. Failing the filter does not mean that a gene has no biological importance. The filter only identifies genes with very little count information in this dataset.
+
+### Further challenge: Compare thresholds
+
+Create a vector containing several possible thresholds:
+
+```{r}
+thresholds <- c(0, 1, 10, 20, 50, 100)
+```
+
+Calculate how many genes would be retained at each threshold:
+
+```{r}
+genes_retained <- sapply(
+  thresholds,
+  function(threshold) {
+    sum(gene_total >= threshold)
+  }
+)
+```
+
+Combine the results into a data frame:
+
+```{r}
+threshold_summary <- data.frame(
+  threshold = thresholds,
+  genes_retained = genes_retained
+)
+```
+
+Calculate the number removed at each threshold:
+
+```{r}
+threshold_summary$genes_removed <-
+  nrow(dds) - threshold_summary$genes_retained
+```
+
+Inspect the result:
+
+```{r}
+threshold_summary
+```
+
+Increasing the threshold should retain fewer genes. However, a more stringent threshold is not automatically better because it may discard genes containing potentially useful information.
+
+The threshold should be chosen for a defensible analytical reason. It should not be selected by repeatedly trying different values and retaining whichever threshold produces the largest number of significant genes.
+
+:::
+
+<script>
+  tippy('[data-tippy-content]');
+</script>
+

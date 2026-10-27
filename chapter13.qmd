@@ -1,0 +1,687 @@
+# Functional Enrichment Analysis
+
+## What you'll learn
+
+In Chapter 5, you connected the Ensembl identifiers in the differential-expression results to the supplied human annotation table using `match()`. That table also contains Entrez identifiers. In this chapter, you will **reuse and audit that existing annotation**, rather than learn a second identifier-mapping workflow.
+
+You will use Gene Ontology (GO) over-representation analysis with `clusterProfiler` to move from individual differentially expressed genes and the expression signatures in Chapters 9 and 10 towards testable biological hypotheses about symptomatic **HAT** and **SERO TL+**.
+
+::: {.callout-note title="Learning outcomes"}
+By the end of this chapter, you should be able to:
+
+- explain the question answered by over-representation analysis (ORA);
+- reuse the annotation concepts and table introduced in Chapter 5;
+- audit whether Entrez mapping covers the selected genes and tested-gene background;
+- define a defensible tested-gene background universe;
+- run GO Biological Process enrichment separately for genes higher in HAT and higher in SERO TL+;
+- interrogate a dot plot and its underlying result table;
+- connect functional enrichment to the expression signatures from Chapters 9 and 10;
+- report analytical choices, limitations and a biologically testable next step.
+
+**ISCB competency framework v3 alignment:** B3, C3, D3, E3, F3, H3 and K3, principally at application and analysis level. The session emphasises reuse of established data resources, reproducible analysis, evaluation of limitations and communication of evidence for a research-scientist audience.
+:::
+
+::: {.callout-important title="Research question"}
+Which GO Biological Process terms are over-represented among genes with higher estimated expression in **symptomatic HAT** than in **SERO TL+**, and do genes higher in SERO TL+ suggest contrasting biological themes?
+
+This is an observational comparison. Enrichment can identify functional annotations associated with the selected gene lists. It cannot demonstrate that a process caused symptoms, that every gene in a process changed, or that the process is active in every participant.
+:::
+
+## Session route map
+
+This session is designed for approximately **150 minutes**:
+
+1. Reconnect with the biological question and predict (15 min)
+2. Retrieve and verify the Chapter 5 annotated result (20 min)
+3. Reuse and audit the identifier annotation (15 min)
+4. Define the ORA universe and directional gene sets (25 min)
+5. Run and inspect HAT enrichment (30 min)
+6. Repeat for SERO TL+ and compare themes (25 min)
+7. Interpret, export and report limitations (20 min)
+
+The central workflow is:
+
+**Chapter 5 annotation → mapped tested genes → directional gene list + tested-gene universe → ORA → term-level and gene-level inspection → cautious biological hypothesis**
+
+## 1. Reconnect with earlier chapters
+
+Chapter 4 fitted the `DESeq2` model and defined the contrast as HAT versus SERO TL+. Chapter 5 then explored and annotated that result. For this contrast:
+
+- a positive `log2FoldChange` means higher estimated expression in HAT;
+- a negative `log2FoldChange` means higher estimated expression in SERO TL+;
+- `padj` describes statistical evidence after correcting for testing many genes.
+
+Chapters 9 and 10 showed that many prioritised genes form coordinated expression patterns. Functional enrichment now provides a systematic way to ask whether the selected genes share more biological-process annotations than expected from the genes that could have been selected.
+
+::: {.callout-tip title="PRIMM activity 1: Predict"}
+Before running new code, discuss:
+
+1. If symptomatic HAT is associated with altered host immune activity, which broad biological themes might be enriched among genes higher in HAT?
+2. Would every gene assigned to an enriched term need to have the same fold change?
+3. Would enrichment of an immune-related term prove that immune activity caused the clinical difference?
+4. Why might genes higher in SERO TL+ reveal different themes rather than simply the opposite list?
+
+Record one prediction:
+
+```r
+# We predict that genes higher in HAT may be enriched for __________
+# because earlier chapters showed __________.
+# This would suggest __________, but would not demonstrate __________.
+```
+:::
+
+::: {.callout-note title="Biological context"}
+HAT is caused by *Trypanosoma* parasites. In this dataset, HAT samples are from symptomatic participants, whereas SERO TL+ samples are serology-positive without the overt HAT phenotype. Expression differences may reflect immune responses, infection stage, parasite burden, circulating cell composition, participant heterogeneity or technical factors. The analysis therefore identifies associations with the sampled clinical groups rather than a controlled transition between states.
+:::
+
+## 2. Continue from Chapters 4 and 5
+
+Use the same RStudio Project. Chapter 4 saved the fitted model, and Chapter 5 introduced `human_annotations_from_orgHs.csv` as the annotation lookup table.
+
+::: {.callout-tip title="Recap: essential setup code" collapse="true"}
+```{r}
+#| label: setup
+#| message: false
+
+library(DESeq2)
+library(clusterProfiler)
+library(enrichplot)
+library(org.Hs.eg.db)
+library(ggplot2)
+
+dir.create("results", showWarnings = FALSE)
+dir.create(file.path("results", "tables"), recursive = TRUE, showWarnings = FALSE)
+dir.create(file.path("results", "figures"), recursive = TRUE, showWarnings = FALSE)
+
+# Load the fitted model saved in Chapter 4
+dds_fitted <- readRDS("results/objects/dds_fitted.rds")
+
+# Recreate the same directional contrast explored in Chapter 5
+res_hat_vs_sero <- results(
+  dds_fitted,
+  contrast = c("status", "hat", "sero"),
+  alpha = 0.05
+)
+
+result_data <- data.frame(
+  gene_id = rownames(res_hat_vs_sero),
+  as.data.frame(res_hat_vs_sero),
+  row.names = NULL,
+  check.names = FALSE,
+  stringsAsFactors = FALSE
+)
+
+# Reuse the annotation resource introduced in Chapter 5
+annotation_data <- read.csv(
+  "human_annotations_from_orgHs.csv",
+  check.names = FALSE,
+  stringsAsFactors = FALSE
+)
+```
+:::
+
+### Verify the result and annotation inputs
+
+```{r}
+resultsNames(dds_fitted)
+table(colData(dds_fitted)$status)
+
+dim(result_data)
+colnames(result_data)
+
+colnames(annotation_data)
+head(annotation_data[, c("ENSEMBL", "SYMBOL_SAFE", "ENTREZID")])
+```
+
+::: {.callout-important title="Checkpoint"}
+Before continuing, answer:
+
+1. What does one row of `result_data` represent?
+2. What does a positive `log2FoldChange` mean for this contrast?
+3. Which column connects `result_data` to `annotation_data`?
+4. Which annotation column was primarily used in Chapter 5?
+5. Which additional annotation column is needed by this enrichment workflow?
+:::
+
+## 3. Reuse the Chapter 5 annotation
+
+Chapter 5 used `match()` to connect `result_data$gene_id` with `annotation_data$ENSEMBL` and retrieve readable gene symbols. We will use the **same rows and the same matching concept** to retrieve the Entrez identifiers already present in the supplied annotation table.
+
+This is not a new mapping method. The new question is whether the existing annotation provides enough coverage for both:
+
+- the genes selected for enrichment;
+- the tested-gene background against which enrichment is assessed.
+
+```{r}
+# Find the corresponding annotation row for every DE result
+matched_rows <- match(
+  result_data$gene_id,
+  annotation_data$ENSEMBL
+)
+
+# Reuse the Chapter 5 gene symbols
+result_data$symbol <- annotation_data$SYMBOL_SAFE[matched_rows]
+
+# Retrieve the Entrez IDs from the same matched rows
+result_data$entrez_id <- annotation_data$ENTREZID[matched_rows]
+
+head(
+  result_data[, c(
+    "gene_id", "symbol", "entrez_id",
+    "log2FoldChange", "padj"
+  )]
+)
+```
+
+::: {.callout-note title="What is new here?"}
+Chapter 5 asked: **Which readable annotation belongs to this Ensembl gene?**
+
+Chapter 11 asks: **Which mapped genes were eligible to enter an enrichment list, and which mapped genes were actually selected?**
+
+The lookup procedure is reused. Its analytical role is new.
+:::
+
+### Audit the reused mapping
+
+First identify genes with a reported adjusted result. These genes define the starting pool for the enrichment background.
+
+```{r}
+tested_genes <- result_data[
+  !is.na(result_data$padj),
+]
+
+mapped_tested_genes <- tested_genes[
+  !is.na(tested_genes$entrez_id) &
+    tested_genes$entrez_id != "",
+]
+
+mapping_audit <- data.frame(
+  measure = c(
+    "Genes with a non-missing adjusted result",
+    "Genes with an Entrez identifier",
+    "Genes without an Entrez identifier",
+    "Unique mapped Entrez identifiers"
+  ),
+  value = c(
+    nrow(tested_genes),
+    nrow(mapped_tested_genes),
+    nrow(tested_genes) - nrow(mapped_tested_genes),
+    length(unique(mapped_tested_genes$entrez_id))
+  )
+)
+
+mapping_success_percent <- round(
+  100 * nrow(mapped_tested_genes) / nrow(tested_genes),
+  1
+)
+
+mapping_audit
+mapping_success_percent
+```
+
+::: {.callout-tip title="PRIMM activity 2: Run and investigate"}
+After running the audit:
+
+1. What percentage of tested genes has an Entrez identifier?
+2. Why might the number of mapped rows differ from the number of unique Entrez IDs?
+3. Which gene classes might be less likely to have an Entrez identifier?
+4. Could mapping loss affect the selected list and background differently?
+5. What mapping information should be reported with the enrichment result?
+:::
+
+::: {.callout-warning title="Do not silently remap missing genes"}
+For consistency with Chapter 5, this workflow uses the supplied course annotation table as the source of truth. Missing Entrez IDs are retained as an explicit limitation. Do not combine several annotation services opportunistically just to maximise the number of reported terms, because that would make the analysis harder to reproduce and could mix annotation releases.
+:::
+
+## 4. Understand the ORA question
+
+ORA asks whether genes annotated to a GO term are **more frequent in a selected list than expected relative to a background universe**. Because many GO terms are tested, p-values are corrected for multiple testing.
+
+For this chapter:
+
+- the **selected list** contains mapped genes meeting the stated adjusted p-value and fold-change thresholds in one direction;
+- the **universe** contains unique mapped genes with a non-missing adjusted DE result;
+- the annotation source used by `enrichGO()` is the human `OrgDb` package;
+- the ontology is GO **Biological Process**;
+- every reported result is conditional on these choices.
+
+::: {.callout-warning title="ORA does not measure pathway activity"}
+ORA begins with a thresholded gene list. It does not use the expression value of every gene. A significant term does not show that every member gene changed, that the complete process is active, or that the process caused the HAT phenotype.
+:::
+
+## 5. Define the tested-gene universe
+
+The universe should represent genes that could plausibly have entered the selected list. Here, that means unique Entrez identifiers for genes with a non-missing adjusted result in the same HAT-versus-SERO TL+ analysis.
+
+```{r}
+ora_universe <- unique(mapped_tested_genes$entrez_id)
+
+length(ora_universe)
+```
+
+::: {.callout-tip title="Parsons task: reconstruct the universe"}
+Arrange these operations into a defensible order:
+
+```r
+ora_universe <- unique(mapped_tested_genes$entrez_id)
+matched_rows <- match(result_data$gene_id, annotation_data$ENSEMBL)
+mapped_tested_genes <- tested_genes[!is.na(tested_genes$entrez_id), ]
+tested_genes <- result_data[!is.na(result_data$padj), ]
+result_data$entrez_id <- annotation_data$ENTREZID[matched_rows]
+```
+
+Then explain why every gene in `org.Hs.eg.db` would be a less appropriate background.
+:::
+
+::: {.callout-tip title="Solution" collapse="true"}
+```r
+matched_rows <- match(result_data$gene_id, annotation_data$ENSEMBL)
+result_data$entrez_id <- annotation_data$ENTREZID[matched_rows]
+tested_genes <- result_data[!is.na(result_data$padj), ]
+mapped_tested_genes <- tested_genes[!is.na(tested_genes$entrez_id), ]
+ora_universe <- unique(mapped_tested_genes$entrez_id)
+```
+
+The universe should represent genes that could have entered the selected list. All annotated human genes include many genes that were not tested or did not have enough information to receive an adjusted result in this RNA-seq analysis.
+:::
+
+## 6. Define directional gene lists
+
+Mixing positive and negative fold changes could combine different biological patterns. Analyse the two directions separately while keeping the thresholds and universe consistent.
+
+```{r}
+hat_genes <- mapped_tested_genes[
+  mapped_tested_genes$padj < 0.05 &
+    mapped_tested_genes$log2FoldChange > 1,
+]
+
+sero_genes <- mapped_tested_genes[
+  mapped_tested_genes$padj < 0.05 &
+    mapped_tested_genes$log2FoldChange < -1,
+]
+
+selection_summary <- data.frame(
+  gene_set = c("Higher in HAT", "Higher in SERO TL+"),
+  mapped_rows = c(nrow(hat_genes), nrow(sero_genes)),
+  unique_entrez_ids = c(
+    length(unique(hat_genes$entrez_id)),
+    length(unique(sero_genes$entrez_id))
+  )
+)
+
+selection_summary
+```
+
+::: {.callout-important title="Thresholds organise evidence"}
+The thresholds reproduce the gene categories used for the Chapter 5 volcano plot. They are practical selection rules, not universal boundaries between biologically important and unimportant genes. Two genes immediately either side of a threshold may have very similar evidence.
+:::
+
+::: {.callout-tip title="PRIMM activity 3: Predict"}
+Before running ORA:
+
+1. Which directional list is larger?
+2. Does a larger list automatically imply stronger enrichment?
+3. Predict one broad theme for each direction.
+4. What might happen if one list contains very few uniquely mapped genes?
+:::
+
+## 7. Run GO Biological Process ORA for genes higher in HAT
+
+```{r}
+hat_ora <- clusterProfiler::enrichGO(
+  gene = unique(hat_genes$entrez_id),
+  universe = ora_universe,
+  OrgDb = org.Hs.eg.db::org.Hs.eg.db,
+  keyType = "ENTREZID",
+  ont = "BP",
+  pAdjustMethod = "BH",
+  pvalueCutoff = 0.05,
+  qvalueCutoff = 0.20,
+  minGSSize = 10,
+  maxGSSize = 500,
+  readable = TRUE
+)
+
+hat_ora_table <- as.data.frame(hat_ora)
+
+nrow(hat_ora_table)
+head(hat_ora_table)
+```
+
+### Read the table before plotting
+
+Important columns include:
+
+- `ID`: GO term identifier;
+- `Description`: readable term name;
+- `GeneRatio`: selected genes assigned to the term relative to the effective input list;
+- `BgRatio`: universe genes assigned to the term relative to the effective background;
+- `p.adjust`: multiple-testing-adjusted p-value;
+- `Count`: number of selected genes contributing to the term;
+- `geneID`: contributing gene identifiers, made readable where possible.
+
+```{r}
+if (nrow(hat_ora_table) > 0) {
+  hat_ora_table[
+    seq_len(min(10, nrow(hat_ora_table))),
+    c("ID", "Description", "GeneRatio", "BgRatio",
+      "p.adjust", "Count", "geneID")
+  ]
+}
+```
+
+::: {.callout-tip title="PRIMM activity 4: Run and investigate"}
+Choose one reported term.
+
+1. What is its adjusted p-value?
+2. How many selected genes contribute?
+3. Which genes are listed in `geneID`?
+4. Do any genes contribute to several top terms?
+5. Is the term sufficiently specific to motivate a useful biological hypothesis?
+6. What would make you cautious even if its adjusted p-value is small?
+:::
+
+### Visualise the HAT result
+
+```{r}
+course_theme <- theme_classic(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold"),
+    axis.title = element_text(face = "bold"),
+    axis.text.y = element_text(size = 8)
+  )
+
+if (nrow(hat_ora_table) > 0) {
+  hat_ora_dotplot <- enrichplot::dotplot(
+    hat_ora,
+    showCategory = 15,
+    label_format = 35
+  ) +
+    labs(
+      title = "GO Biological Process enrichment",
+      subtitle = "Genes with higher estimated expression in HAT",
+      x = "Gene ratio"
+    ) +
+    course_theme
+
+  hat_ora_dotplot
+} else {
+  message("No HAT terms passed the reporting thresholds.")
+}
+```
+
+::: {.callout-note title="How to read the dot plot"}
+Each point represents one GO term. Position, size and colour summarise columns from the enrichment result. The dot plot is a compact view of the table, not additional evidence. Similar GO terms often share genes because GO is hierarchical.
+:::
+
+## 8. Repeat ORA for genes higher in SERO TL+
+
+Use the same universe, ontology and settings so that the biological themes are evaluated under consistent choices.
+
+::: {.callout-tip title="PRIMM activity 5: Modify"}
+Adapt the HAT analysis by changing only the input gene list and object names. Identify what must change and what must remain unchanged before revealing the worked code.
+:::
+
+```{r}
+sero_ora <- clusterProfiler::enrichGO(
+  gene = unique(sero_genes$entrez_id),
+  universe = ora_universe,
+  OrgDb = org.Hs.eg.db::org.Hs.eg.db,
+  keyType = "ENTREZID",
+  ont = "BP",
+  pAdjustMethod = "BH",
+  pvalueCutoff = 0.05,
+  qvalueCutoff = 0.20,
+  minGSSize = 10,
+  maxGSSize = 500,
+  readable = TRUE
+)
+
+sero_ora_table <- as.data.frame(sero_ora)
+
+nrow(sero_ora_table)
+head(sero_ora_table)
+```
+
+```{r}
+if (nrow(sero_ora_table) > 0) {
+  sero_ora_dotplot <- enrichplot::dotplot(
+    sero_ora,
+    showCategory = 15,
+    label_format = 35
+  ) +
+    labs(
+      title = "GO Biological Process enrichment",
+      subtitle = "Genes with higher estimated expression in SERO TL+",
+      x = "Gene ratio"
+    ) +
+    course_theme
+
+  sero_ora_dotplot
+} else {
+  message("No SERO TL+ terms passed the reporting thresholds.")
+}
+```
+
+## 9. Compare biological themes
+
+```{r}
+ora_comparison <- data.frame(
+  direction = c("Higher in HAT", "Higher in SERO TL+"),
+  selected_unique_genes = c(
+    length(unique(hat_genes$entrez_id)),
+    length(unique(sero_genes$entrez_id))
+  ),
+  reported_terms = c(
+    nrow(hat_ora_table),
+    nrow(sero_ora_table)
+  )
+)
+
+ora_comparison
+```
+
+::: {.callout-important title="Partner comparison task"}
+For each direction, select up to three informative terms and record:
+
+1. **Observation:** term, gene ratio, count and adjusted p-value;
+2. **Gene-level evidence:** contributing genes and overlap among terms;
+3. **Biological interpretation:** a plausible connection to symptomatic HAT or SERO TL+;
+4. **Alternative explanation:** cell composition, age, infection stage, parasite burden, sample processing or another unmeasured variable;
+5. **Next step:** a measurement or analysis that could distinguish between explanations.
+
+Use **associated with**, **consistent with**, **suggests** or **motivates the hypothesis that**. Avoid **causes**, **proves** and **the pathway is activated**.
+:::
+
+## 10. Connect enrichment to Chapters 9 and 10
+
+Chapters 9 and 10 grouped genes using similarity in their expression patterns. ORA groups genes because they share curated functional annotations. These provide different forms of evidence.
+
+::: {.callout-tip title="Pearson reasoning task"}
+Discuss:
+
+1. Can two genes share a GO term without having strongly correlated expression?
+2. Can two strongly correlated genes lack a shared GO annotation?
+3. What evidence comes from co-expression, and what evidence comes from annotation?
+4. Why is agreement between an expression signature and an enriched theme interesting but not independent proof of a mechanism?
+5. Which Chapter 10 signatures contain genes contributing to the selected enriched terms?
+:::
+
+To inspect the genes behind the top HAT term:
+
+```{r}
+if (nrow(hat_ora_table) > 0) {
+  top_hat_term <- hat_ora_table[1, ]
+
+  top_hat_genes <- strsplit(
+    as.character(top_hat_term$geneID),
+    "/",
+    fixed = TRUE
+  )[[1]]
+
+  top_hat_term[, c("ID", "Description", "p.adjust", "Count")]
+  top_hat_genes
+}
+```
+
+::: {.callout-warning title="Readable IDs and traceability"}
+Because `readable = TRUE`, the `geneID` field may contain gene symbols. Keep the original directional input tables and the Chapter 5 annotation table so that the analysis remains traceable to Ensembl and Entrez identifiers.
+:::
+
+## 11. Export reproducible outputs
+
+```{r}
+write.csv(
+  mapping_audit,
+  file.path("results", "tables", "T11_identifier_mapping_audit.csv"),
+  row.names = FALSE
+)
+
+write.csv(
+  selection_summary,
+  file.path("results", "tables", "T11_directional_gene_lists.csv"),
+  row.names = FALSE
+)
+
+write.csv(
+  hat_genes,
+  file.path("results", "tables", "T11_genes_higher_in_HAT.csv"),
+  row.names = FALSE
+)
+
+write.csv(
+  sero_genes,
+  file.path("results", "tables", "T11_genes_higher_in_SERO_TL.csv"),
+  row.names = FALSE
+)
+
+write.csv(
+  hat_ora_table,
+  file.path("results", "tables", "T11_ORA_higher_in_HAT.csv"),
+  row.names = FALSE
+)
+
+write.csv(
+  sero_ora_table,
+  file.path("results", "tables", "T11_ORA_higher_in_SERO_TL.csv"),
+  row.names = FALSE
+)
+
+if (exists("hat_ora_dotplot")) {
+  ggsave(
+    filename = "results/figures/T11_ORA_higher_in_HAT_dotplot.png",
+    plot = hat_ora_dotplot,
+    width = 9,
+    height = 7,
+    units = "in",
+    dpi = 300
+  )
+}
+
+if (exists("sero_ora_dotplot")) {
+  ggsave(
+    filename = "results/figures/T11_ORA_higher_in_SERO_TL_dotplot.png",
+    plot = sero_ora_dotplot,
+    width = 9,
+    height = 7,
+    units = "in",
+    dpi = 300
+  )
+}
+
+writeLines(
+  capture.output(sessionInfo()),
+  "results/tables/T11_sessionInfo.txt"
+)
+```
+
+### Save the analysis decisions
+
+```{r}
+ora_decisions <- data.frame(
+  decision = c(
+    "Contrast",
+    "Selected-gene adjusted p-value threshold",
+    "Selected-gene absolute log2 fold-change threshold",
+    "Identifier source",
+    "Identifier lookup",
+    "Universe",
+    "Ontology",
+    "Multiple-testing method",
+    "Minimum GO term size",
+    "Maximum GO term size",
+    "Reporting q-value threshold"
+  ),
+  value = c(
+    "HAT versus SERO TL+",
+    "padj < 0.05",
+    "absolute log2FoldChange > 1",
+    "human_annotations_from_orgHs.csv introduced in Chapter 5",
+    "Ensembl matched to supplied annotation rows; existing Entrez IDs reused",
+    "Unique mapped genes with a non-missing DESeq2 adjusted result",
+    "GO Biological Process",
+    "Benjamini-Hochberg",
+    "10",
+    "500",
+    "0.20"
+  )
+)
+
+write.csv(
+  ora_decisions,
+  "results/tables/T11_ORA_analysis_decisions.csv",
+  row.names = FALSE
+)
+```
+
+::: {.callout-important title="Reproducibility check"}
+```{r}
+file.exists("results/tables/T11_identifier_mapping_audit.csv")
+file.exists("results/tables/T11_ORA_higher_in_HAT.csv")
+file.exists("results/tables/T11_ORA_higher_in_SERO_TL.csv")
+file.exists("results/tables/T11_ORA_analysis_decisions.csv")
+file.exists("results/tables/T11_sessionInfo.txt")
+```
+
+Each check should return `TRUE`. A zero-row ORA table is still a valid result and should be exported and reported.
+:::
+
+## 12. Research-scientist interpretation
+
+::: {.callout-important title="Final synthesis"}
+Write one short scientific paragraph containing:
+
+1. **Input:** how the genes were selected and separated by direction;
+2. **Annotation continuity:** how the Chapter 5 annotation table was reused and audited;
+3. **Method:** GO Biological Process ORA with a tested-gene universe and multiple-testing correction;
+4. **Observation:** one or two prominent themes and genes supporting them;
+5. **Interpretation:** how the themes could relate to symptomatic HAT versus SERO TL+ biology;
+6. **Uncertainty:** mapping coverage, annotation version, threshold dependence, GO redundancy, participant heterogeneity and possible cell-composition or technical effects;
+7. **Next step:** one concrete measurement or analysis that would test the interpretation.
+
+Use this scaffold if helpful:
+
+> Using the Ensembl-to-annotation matches established in Chapter 5, genes with higher estimated expression in ______ were enriched for ______, including genes such as ______. This pattern is consistent with ______. However, the result depends on the selected thresholds, Entrez mapping coverage, annotation version and tested-gene universe, and it cannot distinguish altered expression within cells from changes in circulating cell composition. A useful next step would be to ______.
+:::
+
+## Summary
+
+In this chapter, you:
+
+- reused the Chapter 5 annotation concepts and supplied lookup table rather than repeating identifier mapping as a new method;
+- audited Entrez coverage for genes with a reported differential-expression result;
+- distinguished the selected directional lists from the tested-gene universe;
+- ran GO Biological Process ORA separately for genes higher in HAT and higher in SERO TL+;
+- inspected enrichment tables, dot plots and the genes supporting selected terms;
+- connected annotation-based enrichment to the expression signatures from Chapters 9 and 10;
+- exported results, directional input lists, analytical decisions and software versions;
+- treated enrichment as hypothesis-generating evidence rather than proof of pathway activity or disease mechanism.
+
+The workflow has progressed from individual differential-expression results, through coordinated expression patterns, to functional hypotheses. Those hypotheses require follow-up using clinical metadata, blood-cell composition, independent datasets or experimental validation.
+
+## References and further reading
+
+- Brooksbank C, *et al.* (2024). The ISCB competency framework v3: a revised and extended standard for bioinformatics education and training. *Bioinformatics Advances*, 4(1), vbae166. <https://doi.org/10.1093/bioadv/vbae166>
+- Wu T, *et al.* (2021). clusterProfiler 4.0: A universal enrichment tool for interpreting omics data. *The Innovation*, 2(3), 100141. <https://doi.org/10.1016/j.xinn.2021.100141>
+- Gene Ontology Consortium (2023). The Gene Ontology knowledgebase in 2023. *Genetics*, 224(1), iyad031. <https://doi.org/10.1093/genetics/iyad031>
+- World Health Organization. Human African trypanosomiasis (sleeping sickness). <https://www.who.int/health-topics/human-african-trypanosomiasis>

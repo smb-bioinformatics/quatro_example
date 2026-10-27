@@ -1,0 +1,724 @@
+<style>
+  .tooltip-text {
+    text-decoration: underline dotted #4a5568 2px; /* Dotted line under the word */
+    text-underline-offset: 3px;                     /* Gives space between text and line */
+    cursor: help;                                  /* Changes mouse pointer to a '?' cursor */
+    background-color: #f7fafc;                     /* Optional subtle background highlight */
+    padding: 0 2px;
+    border-radius: 2px;
+  }
+  
+  .tooltip-text:hover {
+    background-color: #e2e8f0;                     /* Highlight on mouseover */
+  }
+</style>
+<link rel="stylesheet" href="https://unpkg.com/tippy.js@6/themes/light.css" />
+
+# Exploring Differential Expression Results
+
+## What you’ll learn
+
+In [Chapter 5](chapter05.qmd), you prepared the count and sample information for differential expression analysis with `DESeq2`. You constructed and inspected a `DESeqDataSet` object, removed genes with very low total counts, fitted a statistical model and extracted a HAT vs. SERO TL+ contrast. You also learned that a positive `log2FoldChange` indicates higher estimated expression in HAT, while a negative value indicates higher estimated expression in SERO TL+, and that the adjusted p-value (`padj`) describes the evidence for a difference after accounting for the thousands of genes tested.
+
+However, the results still use Ensembl identifiers and inspecting the table alone makes it difficult to see the overall pattern of differential expression. In this tutorial, you'll explore the HAT-versus-SERO TL+ results in more detail. You'll use an MA plot to examine how estimated expression differences vary with gene abundance, create a volcano plot that combines effect size with statistical evidence, and compare what the two plots show. You will then match Ensembl identifiers to gene symbols and use the combined evidence to develop a possible biological interpretation.
+
+::: {.callout-note title="Learning outcomes"}
+By the end of this chapter, you should be able to:
+
+- explain what `baseMean`, `log2FoldChange` and `padj` mean in a DESeq2 results table
+- interpret and compare MA and volcano plots
+- identify matching keys in a results table and an annotation table
+- explain what `match()` returns and use it to add aligned gene symbols
+- distinguish statistical evidence, effect size and biological relevance
+- make a biological claim that includes evidence, uncertainty and a suitable next step
+
+:::
+
+::: {.callout-tip title="Try it yourself: Discuss the data"}
+Discuss these questions with a partner before running any code to refresh what you did in the last session:
+
+1. What did each row of the count matrix represent?
+2. What did each column represent?
+3. What did the design `~ status` tell DESeq2?
+4. In the contrast HAT versus SERO TL+, what does a positive `log2FoldChange` mean?
+5. Why is `padj` more useful than an unadjusted p-value when thousands of genes are tested?
+6. Does a statistically significant result necessarily represent a large or biologically important difference?
+
+:::
+
+::: {.callout-tip collapse="true" title="Solution"}
+1. Each row represented one gene. The values across each row were the read counts assigned to that specific gene in each sample.
+
+2. Each column represented one biological sample. The column contained the read counts for all genes measured in that sample.
+
+3. The design `~ status` told DESeq2 to model gene expression using the `status` variable. In this analysis, status distinguishes samples classified as HAT from those classified as SERO TL+.
+
+4. A positive `log2FoldChange` means that the gene had higher estimated expression in HAT versus  SERO TL+. A negative value means higher estimated expression in SERO TL+.
+
+5. `padj` is the p value but adjusted to account for multiple testing. When thousands of tests are performed, some genes will have small unadjusted p-values by chance. The adjusted p-value controls for this multiple-testing problem, reducing the number of false-positive conclusions.
+
+6. No, statistical significance does not necessarily mean that a difference is large or biologically important. A gene can have a small fold change but strong statistical evidence, particularly when the measurements are consistent. Biological importance must be evaluated using the effect size, expression abundance, biological context, study design and any other supporting evidence.
+
+:::
+
+## Continuing the analysis from Chapter 5
+
+We will continue using three objects created in Tutorial 5:
+
+- `dds_fitted` contains the filtered data and fitted DESeq2 model;
+- `res_hat_vs_sero` contains the HAT-versus-SERO TL+ result extracted
+from that model
+- `result_data` is a standard data frame version of that result.
+
+Because these objects should already be available in your R environment, you do not need to create them again. 
+
+::: {.callout-tip collapse="true" title="Recap: If the objects are not available"}
+
+If you restarted R, rerun your script up to the point where these three objects are created:
+
+```{r}
+#| message: false
+#| warning: false
+library(DESeq2)
+library(ggplot2)
+
+dds_fitted <- readRDS(
+  "objects/dds_fitted.rds"
+)
+
+res_hat_vs_sero <- results(
+  dds_fitted,
+  contrast = c("status", "hat", "sero"),
+  alpha = 0.05
+)
+
+result_data <- as.data.frame(res_hat_vs_sero)
+
+result_data$gene_id <- rownames(result_data)
+rownames(result_data) <- NULL
+```
+
+:::
+
+## Examine how expression differences vary with gene abundance
+
+First, we want to examine how the estimated expression differences between HAT and SERO TL+ vary with gene abundance. This is important because a large fold change is not equally convincing at every level of abundance. When a gene has very few counts, small differences in the observed counts can produce a large estimated fold change and that estimate may be relatively uncertain. Genes with higher counts usually provide more information, allowing their fold changes to be estimated more precisely.
+
+An MA plot allows us to examine gene abundance and estimated expression differences together. It provides an overview of the differential expression result for all tested genes, with each point representing one gene.
+
+The term **MA plot** refers to the two quantities traditionally shown:
+
+- **M** represents the log ratio between two measurements. Here, it will be
+  the estimated `log2FoldChange` for HAT compared with SERO TL+.
+- **A** represents average abundance. Here, it is represented by the
+  mean normalised count, or `baseMean`.
+
+The plot shows:
+
+- **Horizontal position:** the mean normalised expression of the gene
+  across all samples, displayed on a logarithmic scale.
+- **Vertical position:** the estimated log2 fold change for HAT compared
+  with SERO TL+.
+- **Colour:** whether the adjusted p-value is below the value supplied
+  to `alpha`.
+
+
+Genes with low mean counts appear on the left, while genes with high mean counts appear on the right. Genes above zero have higher estimated expression in HAT, while genes below zero have higher estimated expression in SERO TL+.
+
+If most genes do not differ strongly between the groups, the main cloud of points should be centred approximately around a log2 fold change of zero. The vertical spread is often wider on the left because fold changes are less precisely estimated for genes with low counts. Toward the right, the greater amount of count information usually produces more stable estimates, so the points often form a narrower band around zero.
+
+The MA plot therefore helps us ask whether large estimated differences occur mainly among low-abundance genes, whether changes occur in both directions, and whether there are broader patterns across the range of gene abundances. A large fold change may be interesting but it should be considered alongside abundance, uncertainty and statistical evidence.
+
+We can create an MA plot from the DESeq2 result using the `plotMA()` function. The function uses an adjusted p-value threshold of 0.1 by default. We will explicitly use `alpha = 0.05` so that the threshold is consistent with the other analyses we will do that use a p-value threshold of 0.05. 
+
+```{r}
+plotMA(
+  res_hat_vs_sero,
+  alpha = 0.05,
+  main = "MA plot: HAT versus SERO TL+"
+)
+```
+
+### What does the MA plot tell us?
+
+We use the MA plot to check whether the estimated fold changes appear reasonable across the range of gene abundances. In particular, we want to know whether large fold changes occur mainly among low-count genes, where the estimates are generally less precise.
+
+Examine the plot and discuss the following questions with a partner before revealing the solution:
+
+1. Is the main cloud of genes centred approximately around a `log2FoldChange` of zero?
+2. Is the spread of fold changes wider among genes with low or high mean counts?
+3. Are genes with `padj < 0.05` found above and below zero?
+4. Based on the plot, which fold changes should be interpreted most cautiously and why?
+
+::: {.callout-tip collapse="true" title="Solution"}
+
+1. Yes. The main cloud is centred approximately around zero, indicating that many genes have relatively small estimated expression differences between HAT and SERO TL+.
+
+2. The spread is widest among genes with low mean counts and generally becomes narrower as abundance increases. This is because low-count genes provide less information for estimating fold changes.
+
+3. Yes. Blue points occur above and below zero. The result therefore includes genes with adjusted p-values below 0.05 that have higher estimated expression in HAT and genes that have higher estimated expression in SERO TL+.
+
+4. Large fold changes among genes with low mean counts should be interpreted most cautiously. Small differences in low counts can produce large fold-change estimates, and these estimates are generally less precise. Fold-change size should therefore be considered alongside abundance and statistical evidence.
+
+Overall, the plot suggests that many genes have relatively small estimated differences, while subsets of genes differ in both directions. Many of the most extreme fold changes occur among low-abundance genes, so a large fold change alone is not sufficient evidence that a gene is biologically important.
+
+:::
+
+::: {.callout-warning title="What if the MA plot looks unusual?"}
+
+An MA plot does not **need** to form a perfect funnel or be exactly symmetrical. Real biological differences may produce more changes in
+one direction than the other.
+
+However, some patterns should prompt further investigation:
+
+- **Most points are shifted above or below zero:** there may be a widespread biological difference, a change in cell composition or a problem with normalisation, sample labels or the model design.
+- **There is a curve or trend across the abundance range:** the estimated fold changes may depend systematically on gene abundance.
+- **The spread remains very wide among high-abundance genes:** some samples may be unusually variable or influential.
+- **Almost all large fold changes occur among very low-abundance genes:** the apparent differences may be driven mainly by uncertain estimates based on small counts.
+
+An unusual MA plot does not identify the cause or automatically mean that the analysis has failed. It tells us we need to examine the sample metadata, count distributions, model design and sample-level plots before drawing biological conclusions.
+
+:::
+
+### Saving the MA Plot
+
+When we used `ggplot2` previously, we could store a plot in an R object and save that object using `ggsave()`. The `plotMA()` function works differently. It draws the plot directly rather than returning a `ggplot2` object so we will have to save it using the more convoluted base R graphics system.
+
+Saving a base R plot involves three steps:
+
+1. Use `png()` to open a PNG graphics device and specify the output filename.
+2. Run the plotting code. While the graphics device is open, the plot is sent to the PNG file instead of being displayed in the Plots pane.
+3. Use `dev.off()` to close the graphics device and finish writing the image file.
+
+```{r}
+png(
+  filename = "figures/MA_hat_vs_sero.png"
+)
+plotMA(
+  res_hat_vs_sero,
+  alpha = 0.05,
+  main = "MA plot: HAT versus SERO TL+"
+)
+dev.off()
+```
+
+::: {.callout-warning title="Remember to close the graphics device"}
+
+If `dev.off()` is not run, R may not finish writing the image correctly.
+Later plots may also continue to be sent to the PNG file instead of
+appearing in the Plots pane.
+
+If this happens, run:
+
+```{r}
+dev.off()
+```
+
+Then create the plot again.
+
+:::
+
+## Examine effect size and statistical evidence together
+
+The MA plot helped us examine whether estimated fold changes varied with gene abundance. We will now consider a different question: which genes combine a relatively large estimated expression difference with strong statistical evidence?
+
+These genes may be useful candidates for further biological investigation. However, a large, statistically supported difference does not automatically make a gene biologically important.
+
+A volcano plot shows:
+
+- **Horizontal position:** the estimated `log2FoldChange` for HAT compared with SERO TL+.
+- **Vertical position:** the adjusted p-value after a `-log10` transformation.
+- **Colour:** whether a gene passes the selected fold-change and adjusted   p-value thresholds.
+
+Genes with negative fold changes appear on the left and have higher estimated expression in SERO TL+. Genes with positive fold changes appear on the right and have higher estimated expression in HAT.
+
+Genes with smaller adjusted p-values appear higher on the plot. Therefore, genes that combine larger fold changes with stronger statistical evidence appear toward the upper-left or upper-right.
+
+Unlike the MA plot, a volcano plot does not show gene abundance. The two plots answer different questions and should be interpreted together.
+
+### Prepare the data
+
+The vertical axis of a volcano plot typically uses `-log10(padj)`. This transformation makes small adjusted p-values easier to see because smaller values appear higher on the plot. Look back at [Chapter 4](chapter04.qmd) for a reminder about logarithmic transformations.
+
+Before applying the transformation, we need to deal with a specific issue. If `DESeq2` could not calculate an adjusted p-value for a gene, it sets the padj as `NA`. This represents missing information rather than a numerical value and it cannot be transformed or plotted on an axis. We can filter these from the results data frame using the `is.na()` function just as we used a >10 counts filter previously. This function returns `TRUE` when the value is missing and `FALSE` when it is present. The symbol `!` means **not**. It reverses the logical values:
+
+- `!TRUE` becomes `FALSE`;
+- `!FALSE` becomes `TRUE`.
+
+Therefore, `!is.na(result_data$padj)` identifies rows where `padj` is **not missing**. We can use this statement to remove rows from the `result_data` data frame with no `padj` value and create a new data frame called `plot_de`.
+
+```{r}
+#| message: false
+plot_de <- result_data[
+  !is.na(result_data$padj),
+]
+```
+
+We can then apply the transformation using the `log10()` function similkar to when we used `log2()` (although we have to add a negative sign so that smaller adjusted p-values produce larger positive values, so genes with stronger statistical evidence appear higher on the plot):
+
+```{r}
+#| message: false
+plot_de$minus_log10_padj <- -log10(plot_de$padj)
+```
+
+### Highlight genes that pass both thresholds
+
+For this plot, we will highlight genes that have:
+
+- an adjusted p-value below 0.05
+- an absolute `log2FoldChange` greater than 1  (so either a value greater than 1 that represents a two-fold higher difference in HAT samples, or -1 that represents a two-fold higher difference in SERO TL+ samples).
+
+In [Chapter 5](chapter05.qmd), you created groups by splitting a table into separate parts and then combining those parts again. Here, we will use a shorter approach.
+
+::: {.callout-note title="You do not need to memorise this code"}
+For now, focus on what the code does.
+
+We will create one new column called `direction`. Every gene will start in the `"Below thresholds"` category. We will then replace that value for genes that meet both the adjusted p-value and fold-change conditions.
+
+This keeps all genes in one data frame and gives `ggplot2` a single column that it can use to assign colours. 
+
+```{r}
+# Create a new column called direction and initially place every gene in a new "Below thresholds" category
+plot_de$direction <- "Below thresholds"
+
+# Find genes that meet BOTH conditions:
+# 1. adjusted p-value below 0.05
+# 2. log2 fold change greater than 1
+#
+# Replace the category only for those genes
+plot_de$direction[
+  plot_de$padj < 0.05 &
+    plot_de$log2FoldChange > 1
+] <- "Higher in HAT"
+
+# Find genes that meet BOTH conditions:
+# 1. adjusted p-value below 0.05
+# 2. log2 fold change less than -1
+#
+# Replace the category only for those genes
+plot_de$direction[
+  plot_de$padj < 0.05 &
+    plot_de$log2FoldChange < -1
+] <- "Higher in SERO TL+"
+
+# Summary table for how many genes are in each category
+table(plot_de$direction)
+```
+
+Genes classified as `"Below thresholds"` may still have a small adjusted p-value or a large fold change but they do not meet both conditions.
+
+These thresholds help us select genes for further investigation. They do not determine whether a gene is biologically important.
+:::
+
+### Build the volcano plot using ggplot2
+
+This is the most detailed `ggplot2` figure we have created so far. You do not need to memorise all of the code and we will explore `ggplot2` and plot customisation in more detail in a later tutorial.
+
+For now, focus on how the plot is built by adding layers. Each layer adds a new feature, such as the points, threshold lines or labels. Hopefully, this example will demonstrate the power of the ggplot2 approach and how a complicated figure can be constructed gradually from a series of simpler components.
+
+**Layer 1: Map the data and draw the points**
+
+We first specify the data and map three variables to visual features, drawing the genes as points with `geom_point`:
+
+- `log2FoldChange` will be shown on the x-axis
+- `minus_log10_padj` will be shown on the y axis
+- `direction` controls point colour (remember, it will either be Higher in HAT, Higher in SERO TL+ or Below Thresholds)
+
+```{r}
+volcano_plot <- ggplot(
+  plot_de,
+  aes(
+    x = log2FoldChange,
+    y = minus_log10_padj,
+    colour = direction
+  )
+) +
+  geom_point()
+
+volcano_plot
+```
+
+::: {.callout-tip title="Try it yourself: Check the first layer"}
+
+Before continuing, check that:
+
+- negative fold changes appear on the left;
+- positive fold changes appear on the right;
+- smaller adjusted p-values appear higher;
+- the point colours correspond to the categories in `direction`.
+
+:::
+
+**Layer 2: Add the threshold lines** 
+
+We can continue adding layers to the `volcano_plot` object we have created to build it up. For example, we can  add vertical lines for the fold-change thresholds at -1 and 1 using `geom_vline()`. We also add a horizontal line for the adjusted p-value threshold using `geom_hline()`. Remember: the value 0.05 must first be transformed because the vertical axis also uses `-log10()`.
+
+```{r}
+ volcano_plot <- volcano_plot +
+  geom_vline(
+    xintercept = c(-1, 1),
+    linetype = "dashed",
+    colour = "grey50"
+  ) +
+  geom_hline(
+    yintercept = -log10(0.05),
+    linetype = "dashed",
+    colour = "grey50"
+  )
+
+volcano_plot
+```
+
+**Layer 3: Add informative labels and a theme**
+
+Finally, we add a title, axis labels and a label for the colour legend. We also apply a simple theme.
+
+```{r}
+volcano_plot <- volcano_plot +
+  labs(
+    title = "Volcano plot: HAT versus SERO TL+",
+    x = "Log2 fold change: HAT versus SERO TL+",
+    y = "-log10 adjusted p-value",
+    colour = "Result category"
+  )
+
+volcano_plot
+```
+### What does the volcano plot tell us?
+
+We use the volcano plot to find genes that combine a relatively large
+estimated expression difference with strong statistical evidence.
+
+Examine the plot and discuss these questions with a partner before revealing the solution:
+
+1. Is the main cloud of genes centred approximately around a `log2FoldChange` of zero?
+2. Are genes that pass both thresholds present on the left and right sides of the plot?
+3. What do points in the upper-left and upper-right regions represent?
+4. Which genes might you prioritise for further investigation, and what additional information would you need before judging their biological importance?
+
+::: {.callout-tip collapse="true" title="Solution"}
+
+1. The densest part of the main cloud is centred approximately around a `log2FoldChange` of zero. However, the distribution is not perfectly symmetrical. More genes extend into the positive side of the plot, indicating more substantial expression differences in the HAT direction.
+
+2. Genes that pass both thresholds are present on both sides of the plot, but they are not equally distributed. There are more green points on the right than blue points on the left. This suggests that more genes pass the selected thresholds with higher estimated expression in HAT than in SERO TL+.
+
+3. Points in the upper-right have positive fold changes and very small adjusted p-values. These genes have higher estimated expression in HAT and strong statistical evidence for a difference. Points in the upper-left have negative fold changes and small adjusted p-values. These genes have higher estimated expression in SERO TL+ and strong statistical evidence for a difference.
+
+4. Genes toward the upper-left and upper-right may be useful candidates for further investigation because they combine relatively large fold changes with strong statistical evidence. In this plot, several of the strongest candidates are in the upper-right region. Before judging their biological importance, we would also need to examine their expression abundance, fold-change uncertainty, gene identity, biological function and relevance to HAT.
+
+Overall, the volcano plot shows statistically supported expression differences in both directions, but the result is weighted toward genes with higher estimated expression in HAT. The plot helps us identify candidate genes for further investigation, but it does not show gene abundance or establish biological importance. We therefore need to
+consider the volcano plot alongside the MA plot and add gene annotations before interpreting particular genes.
+
+:::
+
+In an earlier tutorial, you found that an immune-related gene had higher expression in HAT. You also know that individuals in the HAT group have overt symptoms, while individuals classified as SERO TL+ do not.
+
+**Does the overall pattern in the volcano plot support a broader biological interpretation, or do we need more information before making one?**
+
+### Saving the volcano plot
+
+The volcano plot currently only exists as an object in the R Environment. To use the plot outside R, we can save it as an image using the `ggsave()` function. Try to recall the code from Chapter 3 and Chapter 4 to save the `volcano_plot` as `volcano_hat_vs_sero.png` into the `figures` output directory.
+
+::: {.callout-tip collapse="true" title="Solution"}
+
+```{r}
+ggsave(
+  filename = "figures/volcano_hat_vs_sero.png",
+  plot = volcano_plot
+)
+```
+:::
+
+::: {.callout-warning title="What can a volcano plot hide?"}
+
+A volcano plot does not show gene abundance. A gene with a large fold change may have very low counts and a relatively uncertain effect-size estimate.
+
+The upper-left and upper-right points may be useful candidates, but their positions do not prove biological importance. Interpretation also requires the MA plot, the results table, gene annotations and biological context.
+
+:::
+
+## Compare the MA and volcano plots
+
+Work with a partner to discuss these questions before revealing the solution:
+
+1. What does one point represent in both plots?
+2. What information does the MA plot show that the volcano plot does
+   not?
+3. What information does the volcano plot make easier to assess?
+4. Why should the two plots be interpreted together?
+
+::: {.callout-tip collapse="true" title="Solution"}
+
+1. Each point represents one gene.
+
+2. The MA plot shows gene abundance, allowing us to see whether large estimated fold changes occur mainly among genes with low counts.
+
+3. The volcano plot makes it easier to identify genes that combine a larger estimated fold change with stronger statistical evidence.
+
+4. A volcano plot does not show abundance, while an MA plot does not display statistical evidence as a continuous axis. Together, the plots provide a more complete view of the differential expression result.
+
+:::
+
+## Identify the genes
+
+The MA and volcano plots show where potentially interesting genes occur but the genes are still identified using Ensembl IDs. Ensembl IDs are useful for analysis because they provide a consistent identifier but gene symbols are easier for us to recognise and connect to biological knowledge. To explore our data, we will therefore add gene symbols to the results data frame while keeping the original Ensembl IDs.
+
+### Import the annotation table
+
+First we have to import a csv file that maps Ensembl identifiers to gene symbols. You can download a pre-made table from Moodle that you should place in your project folder but there is also a guide for how these data were prepared included as an optional task below:
+
+```{r}
+annotation_data <- read.csv(
+  "human_annotations_from_orgHs.csv",
+  row.names = 1
+)
+
+head(annotation_data)
+```
+
+The annotation table contains:
+
+- `ENSEMBL`, the identifier we will match;
+- `SYMBOL`, the gene symbol we want to retrieve.
+
+### Use `match()` to connect the tables
+
+The  `match()` function tells us where values from one vector occur in another vector and can be used to look-up values. This works even when the two vectors are not in the same order.
+
+This can be difficult to follow at first, so let’s practise using a small example that has a small vector called `result_ids` and another vector called `annotation_ids` **You do not need to enter or run these statements**.
+
+The two vectors contain the following values:
+
+::: {.columns}
+
+::: {.column width="45%"}
+
+**result_ids**
+
+| Position | Identifier |
+|---:|:---|
+| 1 | `ENSG_A` |
+| 2 | `ENSG_B` |
+| 3 | `ENSG_X` |
+
+:::
+
+::: {.column width="10%"}
+:::
+
+::: {.column width="45%"}
+
+**annotation_ids**
+
+| Position | Identifier |
+|---:|:---|
+| 1 | `ENSG_B` |
+| 2 | `ENSG_C` |
+| 3 | `ENSG_A` |
+
+:::
+
+:::
+
+If we use `match()` to ask where each item in `result_ids` occurs in `annotation_ids` we get this result.
+
+```r
+match(result_ids, annotation_ids)
+[1]  3  1 NA
+```
+
+This means:
+
+1. `"ENSG_A"` is in position 3 of `annotation_ids`;
+2. `"ENSG_B"` is in position 1;
+3. `"ENSG_X"` was not found, so `match()` returns `NA`.
+
+`match()` returns positions, not symbols, so we can use those positions to retrieve the corresponding values from another column. Effectively using another data frame as a *lookup table*.
+
+### Match the real gene identifiers
+
+Let's try it on the Ensembl IDs in the `gene_id` column of `result_data` to find which row in `annotation_data` matches in the `ENSEMBL` column. We'll store the vector in a new object called `matched_rows`.
+
+```{r}
+matched_rows <- match(
+  result_data$gene_id,
+  annotation_data$ENSEMBL
+)
+```
+
+Each value in `matched_rows` gives the position of that gene in `annotation_data`. The order of `matched_rows` follows the order of the genes in `result_data`.
+
+We can use those row positions to retrieve the equivalent gene symbols in the `SYMBOL` column of `annotation_data` and store it as a new column called `symbol` in `result_data`:
+
+```{r}
+result_data$symbol <- annotation_data$SYMBOL[
+  matched_rows
+]
+```
+
+We can check that it worked using the `head()` function:
+
+```{r}
+head(result_data)
+```
+
+The Ensembl IDs and symbols now appear together. The original `gene_id` column has been retained so that each result can still be traced back to the identifier used in the analysis.
+
+::: {.callout-note title="Why are some identifiers not matched?"}
+
+We can count how many Ensembl IDs were not found in the annotation
+table:
+
+```{r}
+sum(is.na(matched_rows))
+```
+
+An `NA` means that an Ensembl ID in `result_data` was not found in this annotation table. It does not mean that the gene was absent from the RNA-seq data or that its DESeq2 result is invalid. A match may be missing because:
+
+- the gene does not currently have an approved gene symbol
+- the count data and annotation table use different annotation releases
+- the Ensembl identifier has been updated, replaced or retired
+- the identifier refers to a transcript or genomic feature that is not represented in this gene annotation table
+
+:::
+
+## Bring the results together
+
+So far, we have examined the same differential expression result in
+three different ways:
+
+- the **MA plot** showed how estimated fold changes varied with gene
+  abundance;
+- the **volcano plot** showed which genes combined larger estimated
+  differences with stronger statistical evidence;
+- the **annotation table** allowed us to connect Ensembl identifiers to
+  recognisable gene symbols.
+
+Together, these approaches help us move from a large statistical results
+table toward a possible biological interpretation.
+
+::: {.callout-tip title="Try it yourself: Interpret the data so far"}
+
+With a partner, select a few annotated genes that you find interesting and discuss:
+
+**What overall biological interpretation, if any, is supported by the MA plot, volcano plot and selected genes? What can these results not yet tell us?**
+
+You do not need to reach a definitive conclusion. Be prepared to explain which evidence supports your interpretation and what remains uncertain.
+
+:::
+
+::: {.callout-tip collapse="true" title="Possible discussion points"}
+
+A reasonable discussion might identify that:
+
+- many genes have relatively small estimated differences between HAT and SERO TL+;
+- subsets of genes show larger, statistically supported differences in both directions;
+- more genes pass the selected thresholds with higher estimated expression in HAT than in SERO TL+;
+- some annotated genes may suggest related biological functions, but this depends on which genes are selected;
+- large fold changes among low-abundance genes should be treated cautiously;
+- passing the selected thresholds does not automatically make a gene biologically important.
+
+The results support an association between expression and sample status in this dataset. They do not establish that the expression differences caused the symptoms, identify the cell types responsible, or show whether every sample follows the same overall pattern.
+
+It is also reasonable to conclude that more information is needed before proposing a clear biological interpretation.
+
+:::
+
+In the next chapter, the unit of analysis changes. In this chapter, each plotted point represented a **gene**. Next time, each plotted point will represent a **sample**, allowing us to ask whether the overall expression profiles of HAT and SERO TL+ samples show a corresponding global pattern.
+
+## Summary
+
+In this chapter, you:
+
+- reconnected with the HAT-versus-SERO TL+ contrast from Chapter 5;
+- interpreted the result using an MA plot;
+- constructed and interpreted a volcano plot using explicit thresholds;
+- compared two complementary views of the same gene-level result;
+- used the need to identify interesting points to motivate gene annotation;
+- used `match()` to connect Ensembl IDs to symbols while retaining the original identifiers;
+- considered why some Ensembl identifiers may not have a matching gene
+  symbol
+- combined statistical, visual and annotation evidence to propose a
+  cautious biological interpretation
+- identified questions that require sample-level analysis
+
+## Optional extra activities
+
+You have now completed the required activities for this chapter. The remaining section is an **optional, but valuable** challenge for further practice. You can attempt it now or return to it later.
+
+::: {.callout-tip title="Optional Activity 1: Choose your own thresholds"}
+
+
+The thresholds used in the volcano plot are analytical choices rather
+than universal rules. Different thresholds may be appropriate depending
+on the purpose of the analysis.
+
+Independently choose:
+
+- an adjusted p-value threshold;
+- a positive and negative `log2FoldChange` threshold.
+
+Modify the classification and plotting code so that the point colours
+and dashed lines represent your chosen values.
+
+Then answer the following questions:
+
+1. Why did you choose these thresholds?
+2. How many genes are placed in each category?
+3. How does your plot differ from the original plot?
+4. Did any points move, or did only their categories and colours change?
+5. What are the advantages and disadvantages of your threshold choices?
+6. Which genes might your thresholds exclude from further investigation?
+7. Would you use the same thresholds for every biological question?
+
+Compare your plot and reasoning with a neighbour. If you selected
+different thresholds, discuss which choice would be most appropriate
+for selecting a manageable set of genes for further investigation.
+
+:::
+
+::: {.callout-tip collapse="true" title="Possible solution"}
+
+There is no single correct pair of thresholds. A good response should
+explain how the chosen thresholds balance effect size, statistical
+evidence and the purpose of the analysis.
+
+A lower adjusted p-value threshold, such as 0.01, requires stronger
+statistical evidence. This will usually highlight fewer genes and may
+produce a more manageable candidate list. However, potentially relevant
+genes with adjusted p-values between 0.01 and 0.05 will be excluded.
+
+A larger absolute fold-change threshold, such as 1.5, focuses attention
+on genes with larger estimated differences. However, genes with smaller
+effects may still be biologically relevant, especially if several genes
+from the same biological process change together.
+
+A less stringent fold-change threshold, such as 0.5, will include more
+genes with moderate estimated differences. This may help identify
+coordinated biological patterns, but it may also produce a long
+candidate list that is difficult to investigate.
+
+The positions of the points should not change because the coordinates
+are determined by the original `log2FoldChange` and `padj` values.
+Changing the thresholds should alter the dashed lines and the categories
+assigned to some genes.
+
+The thresholds should be chosen with reference to the biological
+question and the planned next step. For example, stricter thresholds
+might be useful when selecting a small number of genes for experimental
+validation. Less stringent thresholds might be appropriate when looking
+for coordinated patterns across pathways or groups of genes.
+
+A strong answer should also recognise that threshold-based selection
+creates a sharp boundary. Two genes on opposite sides of a threshold
+may have very similar results. Thresholds are therefore useful for
+organising and prioritising results, but they should not be treated as
+a definitive boundary between biologically important and unimportant
+genes.
+
+:::
+
+<script>
+  tippy('[data-tippy-content]');
+</script>
+

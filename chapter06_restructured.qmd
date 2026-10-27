@@ -1,0 +1,474 @@
+<style>
+  .tooltip-text {
+    text-decoration: underline dotted #4a5568 2px; /* Dotted line under the word */
+    text-underline-offset: 3px;                     /* Gives space between text and line */
+    cursor: help;                                  /* Changes mouse pointer to a '?' cursor */
+    background-color: #f7fafc;                     /* Optional subtle background highlight */
+    padding: 0 2px;
+    border-radius: 2px;
+  }
+  
+  .tooltip-text:hover {
+    background-color: #e2e8f0;                     /* Highlight on mouseover */
+  }
+</style>
+<link rel="stylesheet" href="https://unpkg.com/tippy.js@6/themes/light.css" />
+
+# Fitting and Interpreting the Differential-Expression Model
+
+## What you will learn
+
+In [Chapter 5](chapter05_restructured.qmd), we prepared and saved the filtered `DESeqDataSet`. In this session, we will reload it, fit the DESeq2 model and interpret the HAT-versus-SERO TL+ comparison.
+
+::: {.callout-note title="Learning outcomes"}
+By the end of this session you should be able to:
+
+- explain sequencing-depth adjustment and biological variability in the DESeq2 model
+- extract a specified contrast and interpret its log2 fold changes
+- inspect the main columns in a DESeq2 results table
+- convert, sort and export an unannotated result table
+- save a fitted `DESeqDataSet` for reuse
+
+**ISCB alignment:** **ISCB alignment:** A3 (interpret gene-expression differences in their biological context), C3 (use bioinformatics modelling to investigate a biological question without making a causal overclaim), D3 (fit and an RNA-seq count model, including effect sizes and multiple-testing-adjusted p-values), E3 (export results and save the fitted model reproducibly), F3 (use `DESeq2` to fit a model and retrieve a specified contrast), H3 (use R to manipulate specialised model and result objects), K3 (communicate model results and uncertainty clearly).
+:::
+
+```{r}
+#| message: false
+#| warning: false
+library(DESeq2)
+
+dds_filtered <- readRDS(
+  "objects/dds_filtered.rds"
+)
+```
+
+## Fitting the DESeq2 model
+
+We have now prepared a `DESeqDataSet` called `dds_filtered` containing:
+
+- the original RNA-seq counts
+- information describing each sample
+- the design formula `~ status`
+- only genes that passed our low-count filter
+
+The next step is to fit the DESeq2 model:
+
+```{r}
+#| message: false
+
+dds_fitted <- DESeq(dds_filtered)
+```
+
+During this step the `DESeq()` function performs the main calculations needed to compare gene expression between the biological groups by fitting the model. Although this requires only one line of R code, several steps take place.
+
+**Adjust for size differences between sequencing libraries**
+
+The total number of reads collected can differ between samples. A sample with a larger sequencing library may therefore have higher counts for many genes, even when there is no biological difference in expression.
+
+DESeq2 estimates a **size factor** for each sample. These size factors allow the model to account for differences in sequencing depth and library composition when comparing samples.
+
+This does not mean that `DESeq2` replaces the original counts with log-transformed values. The model still uses the original integer counts.
+
+**Estimate variability among biological samples**
+
+Counts for the same gene will not be identical in every person, even when the people belong to the same biological group.
+
+DESeq2 estimates the **dispersion** of each gene. Dispersion describes how much the counts for that gene vary among biological samples, beyond the variation expected from counting alone.
+
+This is important because an apparent difference between groups is more convincing when the samples within each group show reasonably consistent patterns.
+
+For example, imagine that two genes have the same estimated difference between HAT and SERO TL+:
+
+- the first gene has similar counts among the people within each group
+- the second gene has very different counts among people within the same group
+
+The difference between groups would usually be more convincing for the first gene because there is less variability among its biological replicates.
+
+**Estimate differences associated with status**
+
+Finally, DESeq2 uses the design formula:
+
+```r
+~ status
+```
+
+to fit a separate model for each gene.
+
+The model estimates how the expected count for a gene differs among the levels of `status`, while accounting for library size and variability among biological samples. These estimated group differences are stored as **model coefficients**.
+
+At this stage, the model contains information about all three status groups. We have not yet requested the particular HAT-versus-SERO TL+ comparison. We will do that in the next step using `results()`.
+
+::: {.callout-note title="A simplified overview"}
+
+For each gene, DESeq2 broadly asks:
+
+1. How should differences in sequencing depth between samples be accounted for?
+2. How much do the counts vary among biological samples?
+3. How large is the estimated difference between the biological groups?
+4. Is that difference large relative to its uncertainty?
+
+The final question is assessed using a statistical test. You are not expected to reproduce these calculations yourself.
+
+:::
+
+### What is stored in `dds_fitted`?
+
+The `dds_fitted` object contains the same filtered counts, sample information and design as `dds_filtered`, together with information estimated during model fitting, including size factors, dispersions and model coefficients.
+
+It contains the same filtered counts, sample information and design as `dds_filtered`, together with the information estimated during model fitting, including size factors, dispersions and model coefficients.
+
+We have used a new object name rather than overwriting `dds_filtered` to make it easier to distinguish between:
+
+- `dds`, containing the original genes
+- `dds_filtered`, containing the genes that passed the filter
+- `dds_fitted`, containing the filtered data and fitted model
+
+## Extracting the HAT-versus-SERO TL+ contrast
+
+Finally, we will extract our comparison of interest (HAT vs SERO TL+) using a **contrast**. This tells DESeq2 exactly which two groups to compare and in which direction.
+
+```{r}
+res_hat_vs_sero <- results(
+  dds_fitted,
+  contrast = c("status", "hat", "sero"),
+  alpha = 0.05
+)
+```
+
+The three values in `contrast = c("status", "hat", "sero")` specify:
+
+1. the metadata variable being compared (`status`)
+2. the **numerator** group (`hat`)
+3. the **denominator**, or reference, group for this comparison (`sero`)
+
+
+### Interpreting log2 fold change
+
+DESeq2 reports differences between groups as a `log2FoldChange`. This is the estimated fold change expressed on a log2 scale.
+
+Using a log2 scale makes increases and decreases easier to compare (similar to how we transformed the counts to make them easier to compare in [Chapter 4](chapter04.qmd):
+
+- `log2FoldChange = 0` means no estimated difference
+- `log2FoldChange = 1` means approximately 2-fold higher expression
+- `log2FoldChange = 2` means approximately 4-fold higher expression
+- `log2FoldChange = -1` means approximately 2-fold lower expression
+- `log2FoldChange = -2` means approximately 4-fold lower expression
+
+The direction always depends on the order of the comparison. For HAT versus SERO TL+:
+
+- a positive value indicates higher estimated expression in HAT
+- a negative value indicates higher estimated expression in SERO TL+
+
+::: {.callout-tip title="Try it yourself: Practice interpreting log2 fold change"}
+
+For a HAT versus SERO TL+ comparison, what would each result mean?
+
+1. `log2FoldChange = 0`
+2. `log2FoldChange = 1`
+3. `log2FoldChange = -1`
+4. `log2FoldChange = 2`
+
+:::
+
+::: {.callout-tip collapse="true" title="Suggested answers"}
+
+1. `log2FoldChange = 0` means that there is no estimated difference in expression between HAT and SERO TL+.
+2. `log2FoldChange = 1` means that estimated expression is approximately 2-fold higher in HAT than in SERO ($2^1 = 2$-fold).
+3. `log2FoldChange = -1` means that estimated expression is approximately half as high in HAT as in SERO TL+, because \(2^{-1} = 0.5\). Equivalently, estimated expression is approximately 2-fold higher in SERO TL+ than in HAT.
+4. `log2FoldChange = 2` means that estimated expression is approximately 4-fold higher in HAT than in SERO TL+ ($2^2 = 4$-fold).
+
+:::
+
+::: {.callout-warning title="Fold change is relative"}
+
+A log2 fold change describes gene expression in **one group relative to another group**. It does not tell us the absolute expression of the gene.
+
+For the HAT versus SERO TL+ comparison:
+
+- a positive value means estimated expression is higher in HAT
+- a negative value means estimated expression is higher in SERO TL+
+- a value of zero means there is no estimated difference between the groups
+
+For example, `log2FoldChange = -1` means that estimated expression in HAT is approximately half that in SERO TL+:
+
+$$
+2^{-1} = 0.5
+$$
+
+The interpretation always depends on the order of the comparison.
+
+:::
+
+
+## Inspecting the result
+
+```{r}
+class(res_hat_vs_sero)
+colnames(res_hat_vs_sero)
+head(res_hat_vs_sero)
+```
+
+::: {.callout-note title="What each column means"}
+- `baseMean`: the average normalised count for a gene across all samples
+- `log2FoldChange`: the estimated effect size and direction for the contrast
+- `lfcSE`: the standard error of the fold-change estimate
+- `stat`: the test statistic used to calculate the p-value
+- `pvalue`: the unadjusted p-value value from the statistical test
+- `padj`: the p-value adjusted for multiple testing, because we have tested thousands of genes at once
+
+In this session, we will focus mainly on `log2FoldChange` and `padj`. The log2 fold change describes the estimated size and direction of the difference, while `padj` describes the statistical evidence after accounting for the large number of genes tested. Neither value alone establishes biological importance.
+
+:::
+
+::: {.callout-warning title="Interpreting padj = NA"}
+Some genes have `padj = NA` because an adjusted p-value was not available. This can occur when a gene contains too little information for reliable testing or when it is excluded from multiple-testing adjustment by DESeq2’s internal procedures.
+
+An `NA` does not mean that the gene is significantly or non-significantly different. It means that an adjusted result is unavailable.
+:::
+
+::: {.callout-tip title="Try it yourself: Interpret the summary output"}
+Use `summary(res_hat_vs_sero)` to see how many genes had a `padj` below 0.05. Why might this number differ from simply counting genes with a raw `pvalue` below 0.05?
+:::
+
+::: {.callout-tip collapse="true" title="Possible answer"}
+
+The raw p-values do not account for the thousands of genes tested simultaneously. `padj` applies a multiple-testing correction, so fewer genes will usually have `padj < 0.05` than have `pvalue < 0.05`.
+
+:::
+
+## Creating and saving an unannotated result table
+
+`results()` returns gene identifiers as row names rather than as an ordinary column. To retain these identifiers when the table is reordered or exported, we will copy them into a new `gene_id` column while converting the result to a data frame.
+
+```{r}
+result_data <- data.frame(
+  gene_id = rownames(res_hat_vs_sero),
+  as.data.frame(res_hat_vs_sero),
+  row.names = NULL
+)
+
+head(result_data)
+```
+
+Now we sort the table so that genes with the smallest non-missing adjusted p-values appear first:
+
+```{r}
+result_data <- result_data[
+  order(result_data$padj, na.last = TRUE),
+]
+
+head(result_data, 10)
+```
+
+```{r}
+write.csv(
+  x = result_data,
+  file = "tables/DE_hat_vs_sero_unannotated.csv",
+  row.names = FALSE
+)
+```
+
+## Saving the fitted object
+
+Fitting the model is the most time-consuming step in this analysis, so it is worth saving `dds_fitted`. Later chapters will reload this object for exploratory analyses without rerunning `DESeq()`.
+
+```{r}
+saveRDS(
+  object = dds_fitted,
+  file = "objects/dds_fitted.rds"
+)
+```
+
+::: {.callout-note title="Why save the fitted object?"}
+`saveRDS()` stores an exact copy of an R object in a file. `readRDS()` can later reload that object, which means `dds_fitted` can be reused in another script or session without rerunning `DESeq()`. This is especially useful for larger data sets, where model fitting can take much longer.
+
+:::
+
+## Summary
+
+In this chapter, you:
+
+- fitted the DESeq2 model and considered sequencing-depth adjustment and biological variability
+- extracted and interpreted the HAT-versus-SERO TL+ contrast
+- inspected the main columns in the results table
+- converted, sorted and exported the unannotated results
+- saved `dds_fitted` for reuse in the next sessions
+
+In the next chapter, we will reload the fitted model, explore gene-level results with MA and volcano plots, add gene annotations and investigate a differentially expressed gene.
+
+## Optional extra activities
+
+You have now completed the required activities for this chapter. The following activities provide optional opportunities for further practice.
+
+::: {.callout-tip title="Optional Activity 1: Compare model-fitting times"}
+
+### Further challenge: Compare model-fitting times
+
+To compare model-fitting times after restarting R, first recreate the unfiltered `dds` object from the original counts and sample information:
+
+```{r}
+count_data <- as.matrix(read.csv(
+  "m_sample_counts.csv", header = TRUE, row.names = 1, check.names = FALSE
+))
+sample_info <- read.csv(
+  "m_sample_info.csv", header = TRUE, row.names = 1, check.names = FALSE
+)
+sample_info$status <- factor(sample_info$status)
+
+dds <- DESeqDataSetFromMatrix(
+  countData = count_data,
+  colData = sample_info,
+  design = ~ status
+)
+```
+
+Fit the unfiltered object and record the elapsed time:
+
+```{r}
+unfiltered_time <- system.time({
+  dds_fitted_unfiltered <- DESeq(dds)
+})
+```
+
+Fit the filtered object:
+
+```{r}
+filtered_time <- system.time({
+  dds_fitted_filtered <- DESeq(dds_filtered)
+})
+```
+
+Create a summary:
+
+```{r}
+runtime_summary <- data.frame(
+  analysis = c(
+    "Unfiltered",
+    "Filtered"
+  ),
+  genes = c(
+    nrow(dds),
+    nrow(dds_filtered)
+  ),
+  elapsed_seconds = c(
+    unfiltered_time[["elapsed"]],
+    filtered_time[["elapsed"]]
+  )
+)
+```
+
+Inspect the result:
+
+```{r}
+runtime_summary
+```
+
+The filtered analysis will often be faster because DESeq2 has fewer gene rows to process. For a dataset of this size, however, the difference may be relatively small.
+
+Runtime varies between computers and between runs. A single timing comparison should therefore be treated as an approximate demonstration rather than a precise benchmark.
+
+:::
+
+::: {.callout-tip title="Optional Activity 1: Compare HAT with CTRL"}
+
+So far, we have compared gene expression between HAT and SERO TL+ samples. We can use the same fitted model to investigate a different biological question:
+
+> Which genes show different expression between HAT and CTRL samples?
+
+Create a new contrast that compares **HAT with CTRL**.
+
+Your code should:
+
+1. use `results()` to extract the HAT-versus-CTRL contrast
+2. convert the result into a data frame
+3. retain the Ensembl identifiers in a `gene_id` column
+4. sort the table by adjusted p-value, with the smallest non-missing values first
+5. export the table as:
+
+   ```text
+   tables/DE_hat_vs_ctrl_unannotated.csv
+   ```
+
+Remember that the order of the contrast determines the direction of the log2 fold change:
+
+```r
+contrast = c("variable", "numerator", "denominator")
+```
+
+What is the gene at the top of your list? What might finding the same top-ranked gene in both comparisons suggest about its expression in HAT, SERO TL+ and CTRL samples? What further analysis would you need before concluding that SERO TL+ samples are generally more similar to CTRL than to HAT?
+
+:::
+
+::: {.callout-tip title="Possible solution" collapse="true"}
+
+First, extract the HAT-versus-CTRL contrast:
+
+```{r}
+res_hat_vs_ctrl <- results(
+  dds_fitted,
+  contrast = c("status", "hat", "ctrl"),
+  alpha = 0.05
+)
+```
+
+For this contrast:
+
+- a positive `log2FoldChange` indicates higher estimated expression in HAT
+- a negative `log2FoldChange` indicates higher estimated expression in CTRL
+
+Convert the result into a data frame and retain the Ensembl gene identifiers:
+
+```{r}
+result_hat_vs_ctrl <- data.frame(
+  gene_id = rownames(res_hat_vs_ctrl),
+  as.data.frame(res_hat_vs_ctrl),
+  row.names = NULL
+)
+```
+
+Sort the table so that genes with the smallest non-missing adjusted p-values appear first:
+
+```{r}
+result_hat_vs_ctrl <- result_hat_vs_ctrl[
+  order(result_hat_vs_ctrl$padj, na.last = TRUE),
+]
+```
+
+Inspect the first few rows:
+
+```{r}
+head(result_hat_vs_ctrl, 10)
+```
+
+Finally, export the sorted table:
+
+```{r}
+write.csv(
+  result_hat_vs_ctrl,
+  file.path(
+    "tables",
+    "DE_hat_vs_ctrl_unannotated.csv"
+  ),
+  row.names = FALSE
+)
+```
+
+Check that the file was created:
+
+```{r}
+file.exists(
+  file.path(
+    "tables",
+    "DE_hat_vs_ctrl_unannotated.csv"
+  )
+)
+```
+
+This should return `TRUE`.
+
+:::
+
+<script>
+  tippy('[data-tippy-content]');
+</script>
+

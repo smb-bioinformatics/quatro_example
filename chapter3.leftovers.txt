@@ -1,0 +1,276 @@
+
+# Step 4: Filter genes with very low counts
+
+## Why filter genes?
+
+The imported count matrix contains many genes with zero or very few counts across the complete experiment. These genes provide little information for estimating differences between biological groups.
+
+For this introductory analysis, we will retain genes with at least 10 counts in total across all samples. This is a simple, documented rule for this data set. It is not a universal threshold for every RNA-seq experiment, and other strategies may also consider how many samples contain counts for each gene.
+
+We will construct the filter in three visible stages:
+
+1. calculate one total for each gene
+2. test each total against the threshold
+3. use the resulting logical vector to select rows
+
+## Connect `colSums()` and `rowSums()`
+
+In Chapter 2, we used `colSums()` because each **column** represented a sample:
+
+```r
+total_counts <- colSums(count_data)
+```
+
+This produced one result per sample.
+
+Genes are stored in **rows**, so we now use `rowSums()` to calculate one result per gene:
+
+```{r}
+gene_total_counts <- rowSums(counts(dds))
+head(gene_total_counts)
+```
+
+::: {.callout-tip title="Check your understanding"}
+Complete these statements:
+
+- `colSums(count_data)` works down each sample ______ and returns one result per ______.
+- `rowSums(counts(dds))` works across each gene ______ and returns one result per ______.
+:::
+
+## Create the filtering decision
+
+Test whether each gene has at least 10 total counts:
+
+```{r}
+keep_gene <- gene_total_counts >= 10
+head(keep_gene)
+```
+
+`keep_gene` is a logical vector with one value per gene:
+
+- `TRUE` means that the gene meets the threshold
+- `FALSE` means that the gene does not meet the threshold
+
+Count the decisions:
+
+```{r}
+sum(keep_gene)
+sum(!keep_gene)
+```
+
+When logical values are used in `sum()`, R treats `TRUE` as 1 and `FALSE` as 0. The `!` operator reverses the values, so `sum(!keep_gene)` counts the genes marked for removal.
+
+## Apply the filtering decision
+
+Use `keep_gene` to select the required gene rows. We will create a new object so that the before-and-after states remain visible:
+
+```{r}
+dds_filtered <- dds[keep_gene, ]
+```
+
+Recall the indexing structure from Chapter 2:
+
+```r
+object[rows, columns]
+```
+
+Here:
+
+- `keep_gene` selects rows marked `TRUE`
+- the empty space after the comma retains all sample columns
+
+Compare the dimensions:
+
+```{r}
+dim(dds)
+dim(dds_filtered)
+```
+
+The filtered object should contain fewer gene rows but the same number of sample columns.
+
+## Parsons problem: reconstruct the filtering workflow
+
+::: {.callout-tip title="Put the statements in order"}
+The following statements have been placed in the wrong order. Arrange them so that every object exists before it is used.
+
+```r
+nrow(dds_filtered)
+
+dds_filtered <- dds[keep_gene, ]
+
+keep_gene <- gene_total_counts >= 10
+
+gene_total_counts <- rowSums(counts(dds))
+```
+
+Then label each statement as one of the following:
+
+- calculate evidence
+- make a decision
+- apply a decision
+- check the result
+:::
+
+## Consider the biological consequences
+
+::: {.callout-note title="Biological synthesis"}
+Consider two genes with the same total count:
+
+```text
+Gene A: 10, 0, 0, 0, 0, 0
+Gene B:  2, 2, 2, 2, 2, 0
+```
+
+1. Would both genes pass the current filter?
+2. Do they show the same pattern of detection across samples?
+3. Which appears more consistently detected?
+4. Suggest a biological or technical process that could produce each pattern.
+5. What information about the experimental groups is missing from this comparison?
+6. Could a biologically important gene be removed by a filtering rule? Describe a possible example.
+:::
+
+::: {.callout-note title="Filtering is an analytical decision"}
+Filtering does not identify statistically significant genes. It defines which genes contain enough count information to be included in the planned analysis.
+
+The rule and its consequences should be recorded because different thresholds or strategies may retain different sets of genes.
+:::
+
+# Step 5: Save the analysis-ready object
+
+The `dds_filtered` object now contains:
+
+- the original integer counts for the retained genes
+- the information describing every sample
+- the design `~ status`
+- the same sample order that was checked before construction
+
+Save the object so that it can be reused in the next chapter:
+
+```{r}
+saveRDS(
+  dds_filtered,
+  file = file.path(
+    "results",
+    "objects",
+    "dds_filtered.rds"
+  )
+)
+```
+
+`saveRDS()` saves one R object to a file. It preserves the specialised `DESeqDataSet` structure, unlike a CSV file, which is limited to a simple table.
+
+You can check that the file exists:
+
+```{r}
+file.exists(
+  file.path(
+    "results",
+    "objects",
+    "dds_filtered.rds"
+  )
+)
+```
+
+The result should be `TRUE`.
+
+::: {.callout-tip collapse="true" title="How the object can be restored later"}
+After restarting R, the saved object can be restored with:
+
+```r
+dds_filtered <- readRDS(
+  file.path(
+    "results",
+    "objects",
+    "dds_filtered.rds"
+  )
+)
+```
+
+Your full analysis should still remain recorded in the script. The saved object is a convenient intermediate output, not a replacement for reproducible code.
+:::
+
+# Integration activity
+
+::: {.callout-important title="Make a justified analytical recommendation"}
+Imagine that you observe the following:
+
+- one sample has a somewhat different count distribution
+- that sample also has the smallest library size
+- it does not have the smallest number of detected genes
+- the sample metadata show that it belongs to the HAT group
+- approximately half of the imported genes fail the count filter
+
+Working with a partner, write:
+
+1. one conclusion that is supported by the current evidence
+2. one conclusion that is **not** yet supported
+3. one biological explanation and one technical explanation for the unusual sample
+4. one additional quality-control check you would perform
+5. one risk of removing the sample immediately
+6. one filtering decision that should be reported for reproducibility
+
+Be prepared to explain which evidence supports each statement.
+:::
+
+# Summary
+
+In Chapter 2, we created `sample_summary`, a simplified sample-level view of the data for quality control. In this chapter, we returned to the same source objects and prepared the complete gene-level data for statistical analysis.
+
+You have now:
+
+- extended the sample quality control with a count-distribution plot
+- transformed and reshaped a copy of the data without altering the original counts
+- combined evidence from total counts, detected genes and count distributions
+- repeated the check that count-data columns and metadata rows are aligned
+- connected `sample_summary` and `dds` as two views of the same source data
+- built a `DESeqDataSet` from the count matrix, sample information and design
+- verified that constructing the object did not change the library sizes
+- connected `colSums()` from Chapter 2 with `rowSums()` in this chapter
+- created and applied a logical vector to filter gene rows
+- saved the analysis-ready `dds_filtered` object
+
+In Chapter 4, we will fit the differential-expression model and extract a gene-level results table. At that stage, the Ensembl identifiers will become difficult to interpret, so we will add readable gene annotations when they solve a visible biological need.
+
+::: {.callout-note title="Before moving on"}
+Save `HAT_analysis.R`, restart R and run the script from the beginning. Check that it recreates the plot, `dds_filtered` and the saved RDS file without relying on objects left in the Environment.
+:::
+
+# Optional practice
+
+## Modify the visualisation
+
+Recreate `count_distribution_plot` without `coord_flip()`.
+
+- Which version is easier to read?
+- Has the underlying data changed?
+- Which part of the code changes the data, and which part changes only the display?
+
+## Explore a different filtering threshold
+
+Without overwriting `dds_filtered`, calculate how many genes would be retained using thresholds of 1, 10 and 50 total counts.
+
+```{r}
+sum(gene_total_counts >= 1)
+sum(gene_total_counts >= 10)
+sum(gene_total_counts >= 50)
+```
+
+- How does the retained number change?
+- Why is there no universally correct threshold based only on these three numbers?
+- What features of the experiment might affect the choice?
+
+## Inspect a familiar gene inside `dds`
+
+In Chapter 2, you selected the counts for *APOL1* using its Ensembl identifier. Retrieve the same row from the counts stored inside `dds`:
+
+```{r}
+counts(dds)["ENSG00000100342", ]
+```
+
+Compare it with:
+
+```{r}
+count_data["ENSG00000100342", ]
+```
+
+Use R to check whether the values are equal. Explain what the result tells you about constructing a `DESeqDataSet`.

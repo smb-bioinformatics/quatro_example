@@ -1,0 +1,360 @@
+# Exploratory Data Analysis
+
+## What you'll learn
+
+In this tutorial, you'll retrieve the fitted model from Chapter 4, create variance-stabilised expression values, select a focused subset of samples and genes, then use Principal Component Analysis (PCA) and a sample-distance heatmap to explore relationships between samples.
+
+::: {.callout-note}
+## Learning outcomes
+By the end of this chapter you should be able to:
+
+- explain why raw counts are not used directly for PCA and sample-distance analysis
+- obtain a variance-stabilised expression matrix from a fitted `DESeqDataSet`
+- select samples using aligned metadata and a logical condition
+- identify genes with high variation across selected samples
+- arrange a matrix in the orientation required by `prcomp()`
+- construct and interpret a PCA plot
+- calculate and visualise distances among samples
+- compare evidence from PCA and a sample-distance heatmap
+- avoid interpreting visual separation as proof of biological causation
+
+**ISCB alignment:** C3, D3, F3 and K3, at application/analysis level.
+:::
+
+::: {.callout-tip title="Recap: code so far" collapse="true"}
+```{r}
+#| message: false
+dir.create("results", showWarnings = FALSE)
+dir.create(file.path("results", "tables"), recursive = TRUE, showWarnings = FALSE)
+dir.create(file.path("results", "figures"), recursive = TRUE, showWarnings = FALSE)
+
+library(DESeq2)
+library(ggplot2)
+library(pheatmap)
+```
+:::
+
+## Retrieving the fitted object
+
+Chapter 4 saved the fitted model as an RDS file so that we do not need to repeat the filtering and model-fitting steps here. We load it, and recover the sample metadata directly from the object itself:
+
+```{r}
+dds_fitted <- readRDS(
+  file.path("results", "objects", "dds_fitted.rds")
+)
+
+sample_info <- as.data.frame(
+  colData(dds_fitted)
+)
+```
+
+```{r}
+class(dds_fitted)
+dim(dds_fitted)
+head(sample_info)
+```
+
+::: {.callout-note title="Why recover sample_info from dds_fitted?"}
+`dds_fitted` already contains the sample metadata that was supplied when it was constructed in Chapter 4, including the `status` factor. Recovering it with `colData()` guarantees that `sample_info` is aligned with `dds_fitted`, rather than re-reading the original CSV file and risking a mismatch.
+:::
+
+## Variance-stabilising the counts
+
+::: {.callout-tip title="Try it yourself: which representation is suitable?"}
+Before creating any new values, consider which of these representations is most suitable for comparing overall relationships between samples:
+
+1. raw counts
+2. the `log2(count + 1)` values from Chapter 3
+3. normalised counts
+4. variance-stabilised values
+
+::: {.callout-tip collapse="true" title="Solution"}
+Variance-stabilised values (option 4) are used for this kind of exploratory comparison. Raw counts are dominated by library-size differences. The Chapter 3 `log2(count + 1)` values were only ever intended for a single introductory boxplot. Normalised counts correct for library size but still have variance that depends strongly on the mean, which can distort distance calculations and PCA.
+:::
+:::
+
+Raw counts cannot be compared directly between samples, because samples have different total sequencing depth, and their variance increases with their mean. We apply a **variance-stabilising transformation (VST)** to the fitted `dds_fitted` object:
+
+```{r}
+vsd <- vst(dds_fitted, blind = FALSE)
+
+vst_values <- assay(vsd)
+```
+
+::: {.callout-note title="What are vsd and vst_values?"}
+- `vsd` is a specialised DESeq2 transformation object.
+- `vst_values` is the gene-by-sample matrix retrieved from it using `assay()`.
+- The transformation reduces the strong dependence of variance on mean abundance, making the values suitable for exploratory sample comparisons.
+- These values are **not** used to refit the differential-expression contrast from Chapter 4 — that contrast already used the raw counts inside `dds_fitted`.
+:::
+
+::: {.callout-note title="What does blind = FALSE mean?"}
+`blind = FALSE` allows estimation of the transformation to use the existing experimental design. PCA itself is still an unsupervised summary of the transformed expression values — the design is only used to stabilise the variance estimate, not to influence which components the PCA finds.
+:::
+
+```{r}
+class(vsd)
+class(vst_values)
+dim(vst_values)
+vst_values[1:5, 1:4]
+```
+
+## Selecting the SERO and HAT samples
+
+For the next few chapters we'll focus on the SERO and HAT samples only. We build this selection in stages, following the same pattern used for gene filtering in Chapter 4: **calculate information → create a logical decision → subset → verify**.
+
+```{r}
+sample_status <- sample_info[
+  colnames(vst_values),
+  "status"
+]
+
+keep_sample <- sample_status %in% c("sero", "hat")
+
+selected_samples <- colnames(vst_values)[keep_sample]
+
+selected_vst <- vst_values[
+  ,
+  selected_samples,
+  drop = FALSE
+]
+```
+
+::: {.callout-note title="What does each line do?"}
+- `sample_status` looks up the `status` value for each sample, using the column names of `vst_values` to align the metadata rather than assuming the row order matches.
+- `keep_sample` is a logical vector: `TRUE` for samples whose status is `"sero"` or `"hat"`, `FALSE` otherwise.
+- `selected_samples` uses `keep_sample` to pick out the matching sample names.
+- `selected_vst` subsets the columns of `vst_values` to keep only those samples. `drop = FALSE` ensures the result remains a matrix even if only one sample were selected.
+:::
+
+```{r}
+table(keep_sample)
+
+dim(selected_vst)
+
+colnames(selected_vst)
+
+table(
+  sample_info[colnames(selected_vst), "status"]
+)
+```
+
+::: {.callout-tip title="Try it yourself"}
+Before running the code above, predict how many samples you expect `keep_sample` to mark as `TRUE`. Check your prediction against `table(keep_sample)`.
+:::
+
+## Selecting the most variable genes
+
+PCA is normally run on the most variable genes, not the genes found significant in a specific contrast — this keeps the exploration independent of any one hypothesis test.
+
+```{r}
+gene_variance <- apply(selected_vst, 1, var)
+
+ordered_variance <- sort(gene_variance, decreasing = TRUE)
+
+ordered_gene_ids <- names(ordered_variance)
+```
+
+::: {.callout-note title="What does apply(selected_vst, 1, var) do?"}
+The `1` in `apply(selected_vst, 1, var)` means **apply the function across rows**. Each row of `selected_vst` represents a gene, so this produces one variance value per gene. Sorting `gene_variance` does not use the biological group labels at all — genes are ranked purely by how much their values vary across the selected samples.
+:::
+
+```{r}
+n_top_pca_genes <- min(500, length(ordered_gene_ids))
+
+top_pca_gene_ids <- ordered_gene_ids[1:n_top_pca_genes]
+
+pca_input <- selected_vst[
+  top_pca_gene_ids,
+  ,
+  drop = FALSE
+]
+
+dim(pca_input)
+```
+
+::: {.callout-important title="Do not select genes using the target contrast"}
+Selecting the most variable genes is intended to focus PCA on genes that contribute to differences among samples in general. Genes must not be selected using the HAT-versus-SERO contrast from Chapter 4 merely to make separation appear stronger — that would make the exploratory analysis circular.
+:::
+
+::: {.callout-tip title="Try it yourself"}
+`length(ordered_gene_ids)` gives the total number of genes available. Why might `n_top_pca_genes` be smaller than 500 if a chapter used a much smaller example data set?
+:::
+
+## Matrix orientation for PCA
+
+::: {.callout-tip title="Try it yourself: think before you transpose"}
+Are samples currently the rows or the columns of `pca_input`? What orientation does `prcomp()` need if it is to treat each *sample* as one observation?
+:::
+
+```{r}
+pca_matrix <- t(pca_input)
+
+dim(pca_input)
+dim(pca_matrix)
+```
+
+`prcomp()` expects observations (samples) as rows and variables (genes) as columns, so we transpose `pca_input` before running the PCA.
+
+## Running the PCA
+
+```{r}
+pca_fit <- prcomp(
+  pca_matrix,
+  center = TRUE,
+  scale. = FALSE
+)
+```
+
+`center = TRUE` centres each gene to a mean of zero before finding the components. `scale. = FALSE` leaves the variance untouched, because the VST step has already stabilised it. We will treat the internal calculations of `prcomp()` as a worked example rather than something to reproduce by hand.
+
+```{r}
+pca_variance <- 100 *
+  pca_fit$sdev^2 /
+  sum(pca_fit$sdev^2)
+
+round(pca_variance[1:3], 1)
+```
+
+## Preparing the PCA data for plotting
+
+```{r}
+pca_data <- as.data.frame(
+  pca_fit$x[, 1:2, drop = FALSE]
+)
+
+pca_data$sample_id <- rownames(pca_data)
+
+pca_data$status <- sample_info[
+  pca_data$sample_id,
+  "status"
+]
+```
+
+```{r}
+head(pca_data)
+
+sum(is.na(pca_data$status))
+```
+
+::: {.callout-note title="Why look up status by sample identifier?"}
+We look up `status` using `sample_info[pca_data$sample_id, "status"]` rather than assuming the row order of `pca_data` matches `sample_info`. Looking values up by identifier protects the analysis from being silently broken if the rows are ever reordered upstream.
+:::
+
+## A named colour palette and theme
+
+```{r}
+GROUP_COLOURS <- c(
+  sero = "#1B9E77",
+  hat = "#D95F02"
+)
+```
+
+The names in `GROUP_COLOURS` must exactly match the group labels in `status`, so that `ggplot2` can map each colour to the correct group.
+
+```{r}
+course_theme <- theme_classic(base_size = 12)
+```
+
+Chapter 7 will look more closely at customising themes and colour palettes; here we simply reuse a supplied theme so that our PCA plot has a clean appearance.
+
+```{r}
+pca_plot <- ggplot(pca_data, aes(PC1, PC2, colour = status)) +
+  geom_point(size = 3) +
+  scale_colour_manual(values = GROUP_COLOURS) +
+  labs(
+    title = "PCA of SERO TL+ and HAT samples",
+    x = sprintf("PC1 (%.1f%% variance)", pca_variance[1]),
+    y = sprintf("PC2 (%.1f%% variance)", pca_variance[2]),
+    colour = "Treatment group"
+  ) +
+  course_theme
+
+ggsave(
+  file.path("results", "figures", "T05_PCA_sero_hat.png"),
+  pca_plot,
+  width = 6.5,
+  height = 5,
+  dpi = 300
+)
+
+pca_plot
+```
+
+## Calculating sample distances
+
+PCA and a distance heatmap answer a similar question in different ways — it's worth looking at both.
+
+::: {.callout-tip title="Try it yourself"}
+`dist()` calculates distances between the **rows** of a matrix. `selected_vst` currently has genes as rows and samples as columns. Why must `selected_vst` be transposed before calling `dist()`?
+:::
+
+```{r}
+sample_dist <- as.matrix(
+  dist(t(selected_vst))
+)
+```
+
+```{r}
+sample_annotation <- sample_info[
+  colnames(selected_vst),
+  "status",
+  drop = FALSE
+]
+```
+
+`sample_annotation` uses the sample identifiers from `colnames(selected_vst)` as its row names, which is exactly what the heatmap function expects.
+
+## A sample-distance heatmap
+
+```{r}
+pheatmap(
+  sample_dist,
+  annotation_col = sample_annotation,
+  annotation_row = sample_annotation
+)
+```
+
+We also save a copy of the heatmap to the figures folder:
+
+```{r}
+pheatmap(
+  sample_dist,
+  annotation_col = sample_annotation,
+  annotation_row = sample_annotation,
+  filename = file.path("results", "figures", "T05_sample_distance_heatmap.png"),
+  width = 7,
+  height = 6
+)
+```
+
+## Integrated interpretation
+
+::: {.callout-note title="Interpretation checkpoint"}
+- Which samples appear close together in **both** the PCA plot and the distance heatmap?
+- Is any single sample unusual in both views?
+- How much variance is represented by PC1 and PC2 combined?
+- How much variation is **not** visible on the first two axes?
+- Do the plots support a descriptive pattern of separation between groups?
+- Why do they not, on their own, prove that `status` *caused* that pattern?
+- What other technical or biological variables (for example, sequencing batch, age or sex) could also influence how samples relate to one another?
+:::
+
+::: {.callout-tip title="Try it yourself"}
+Repeat the PCA using the top 100 and the top 1,000 variable genes (change `n_top_pca_genes` and rerun). Compare the resulting coordinates and variance explained. Keep your original 500-gene analysis as the "official" version, and document the effect of this choice rather than simply picking whichever plot looks most separated.
+:::
+
+## Summary
+
+You've now:
+
+- retrieved a fitted `DESeqDataSet` saved in Chapter 4, rather than repeating the model fit
+- explained why variance-stabilised values, not raw counts, are used to explore sample relationships
+- selected a focused subset of samples using aligned metadata and a logical condition
+- selected the most variable genes for an unbiased exploratory analysis
+- arranged the expression matrix in the orientation required by `prcomp()`
+- run and interpreted a PCA, including the percentage of variance explained
+- calculated sample distances and built a sample-distance heatmap
+- compared evidence from the PCA plot and the heatmap, without treating separation as proof of a causal effect
+
+In the next chapter, we'll match the Ensembl IDs in our differential expression results against an annotation file and create volcano and MA plots.

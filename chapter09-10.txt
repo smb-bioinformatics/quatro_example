@@ -1,0 +1,298 @@
+# Pattern discovery and hierarchical clustering
+
+## What you'll learn
+
+In this tutorial, you'll compare the expression of multiple genes simultaneously and learn to arrange plots using faceting.
+
+::: {.callout-note}
+## Learning outcomes
+By the end of this chapter you should be able to:
+
+- reshape expression values from wide format to long format
+- explain why `ggplot2` works naturally with "one observation per row" data
+- use facets to compare several genes without duplicating plotting code
+- evaluate whether free or shared y-axis scales better answer your question
+:::
+
+::: {.callout-tip title="Recap: code so far" collapse="true"}
+```{r}
+#| message: false
+dir.create("results", showWarnings = FALSE)
+dir.create(file.path("results", "tables"), recursive = TRUE, showWarnings = FALSE)
+dir.create(file.path("results", "figures"), recursive = TRUE, showWarnings = FALSE)
+
+
+library(DESeq2)
+library(ggplot2)
+
+count_data <- as.matrix(read.csv("m_sample_counts.csv", header = TRUE, row.names = 1, check.names = FALSE))
+sample_info <- read.csv("m_sample_info.csv", header = TRUE, row.names = 1, check.names = FALSE)
+sample_info <- sample_info[colnames(count_data), , drop = FALSE]
+sample_info$status <- factor(sample_info$status)
+
+dds <- DESeqDataSetFromMatrix(countData = count_data, colData = sample_info, design = ~ status)
+dds <- dds[rowSums(counts(dds)) >= 10, ]
+
+gene_annotation <- data.frame(gene_id = rownames(dds), stringsAsFactors = FALSE)
+annotation_file <- read.csv("human_annotations_from_orgHs.csv", check.names = FALSE, stringsAsFactors = FALSE)
+gene_annotation$symbol <- annotation_file$SYMBOL_SAFE[match(gene_annotation$gene_id, annotation_file$ENSEMBL)]
+missing_symbol <- is.na(gene_annotation$symbol) | gene_annotation$symbol == ""
+gene_annotation$symbol[missing_symbol] <- gene_annotation$gene_id[missing_symbol]
+
+dds <- DESeq(dds)
+res_hat_vs_sero <- results(dds, contrast = c("status", "hat", "sero"), alpha = 0.05)
+
+vsd <- vst(dds, blind = FALSE)
+vst_values <- assay(vsd)
+selected_samples <- colnames(vst_values)[sample_info[colnames(vst_values), "status"] %in% c("sero", "hat")]
+selected_vst <- vst_values[, selected_samples]
+
+result_data <- as.data.frame(res_hat_vs_sero)
+res_hat_vs_sero_table <- data.frame(
+  gene_id = rownames(result_data),
+  symbol = gene_annotation$symbol[match(rownames(result_data), gene_annotation$gene_id)],
+  result_data, row.names = NULL, check.names = FALSE, stringsAsFactors = FALSE
+)
+res_hat_vs_sero_table <- res_hat_vs_sero_table[order(res_hat_vs_sero_table$padj, na.last = TRUE), ]
+plot_de <- res_hat_vs_sero_table
+
+GROUP_COLOURS <- c(
+  ctrl = "#4D4D4D", sero = "#1B9E77", hat = "#D95F02"
+)
+course_theme <- theme_classic(base_size = 12) +
+  theme(plot.title = element_text(face = "bold", size = 14), axis.title = element_text(face = "bold"),
+        axis.text = element_text(size = 11))
+```
+:::
+
+## Selecting genes to compare
+
+```{r}
+valid_de <- plot_de[!is.na(plot_de$padj), ]
+valid_de <- valid_de[order(valid_de$padj), ]
+top_gene_ids <- head(valid_de$gene_id, 6)
+top_gene_ids
+```
+
+## Reshaping from wide to long format
+
+`selected_vst` has genes as rows and samples as columns — this is convenient for storage, but `ggplot2` needs "one row per observation".
+
+```{r}
+expression_matrix <- t(selected_vst[top_gene_ids, , drop = FALSE])
+```
+
+::: {.callout-tip title="Try it yourself"}
+Run `dim(expression_matrix)` before continuing. After transposing, what does a single row of `expression_matrix` now represent?
+
+::: {.callout-tip title="Solution" collapse="true"}
+Each row is now one **sample**, and each column is one **gene**. Before transposing, `selected_vst` had genes as rows and samples as columns; `t()` swaps rows and columns so we can build a table with one sample per row, which is what the next reshaping step needs.
+:::
+:::
+
+```{r}
+top_gene_long <- stack(as.data.frame(expression_matrix, check.names = FALSE))
+colnames(top_gene_long) <- c("expression", "gene_id")
+top_gene_long$sample_id <- rep(rownames(expression_matrix), ncol(expression_matrix))
+top_gene_long$status <- sample_info[top_gene_long$sample_id, "status"]
+top_gene_long$symbol <- gene_annotation$symbol[
+  match(as.character(top_gene_long$gene_id), gene_annotation$gene_id)
+]
+```
+
+::: {.callout-important}
+## Check your understanding
+Run `head(top_gene_long)` and `dim(top_gene_long)`. Identify which column records the measured value, which records the sample, which records the treatment group, and which two columns identify the gene.
+
+::: {.callout-tip title="Solution" collapse="true"}
+```{r}
+head(top_gene_long)
+dim(top_gene_long)
+```
+`expression` is the measured value; `sample_id` records the sample; `status` records the treatment group; `gene_id` and `symbol` both identify the gene (as an Ensembl ID and a human-readable symbol respectively).
+:::
+:::
+
+## Faceted plot
+
+```{r}
+distribution_plot <- ggplot(
+  top_gene_long,
+  aes(x = status, y = expression, colour = status)
+) +
+  geom_boxplot(outlier.shape = NA, width = 0.55, alpha = 0.15) +
+  geom_jitter(width = 0.08, size = 1.8) +
+  facet_wrap(~ symbol, scales = "free_y") +
+  scale_colour_manual(values = GROUP_COLOURS) +
+  labs(x = "Treatment group", y = "Variance-stabilised expression") +
+  course_theme +
+  theme(legend.position = "none")
+
+ggsave(file.path("results", "figures", "T08_top_gene_distributions.png"), distribution_plot, width = 9, height = 6, dpi = 300)
+distribution_plot
+```
+
+::: {.callout-tip title="Try it yourself"}
+Change `scales = "free_y"` to `scales = "fixed"` and re-render the plot. Which version is better for comparing the *magnitude* of expression between genes? Which is better for comparing the *pattern* between groups within each gene?
+
+::: {.callout-tip title="Solution" collapse="true"}
+`scales = "fixed"` puts every panel on the same y-axis, which is better for comparing absolute expression level between genes (you can see which gene is expressed highest overall). `scales = "free_y"` gives each gene its own y-axis range, which is better for seeing the shape of the group difference within each gene, even if that gene's overall expression is much lower than another's.
+:::
+:::
+
+## Summary
+
+You've now:
+
+- reshaped a wide expression matrix into the long format `ggplot2` expects
+- built a faceted plot showing several genes at once with a single call to `ggplot()`
+- compared `scales = "free_y"` against `scales = "fixed"` and understood the trade-off
+
+In the next chapter, we pause the coding to consolidate what we've learned so far, before returning to look for patterns *among genes* using clustering.
+
+
+# Gene-expression heatmaps and expression signatures
+
+## What you'll learn
+
+In this tutorial, you'll identify gene clusters using k-means clustering and visualize coordinated expression patterns across genes.
+
+::: {.callout-note}
+## Learning outcomes
+By the end of this chapter you should be able to:
+
+- standardise expression per gene and explain the resulting z-scores
+- distinguish hierarchical clustering from k-means clustering
+- apply a random seed and multiple starts for reproducible clustering
+- describe expression patterns without claiming that clusters represent absolute truth
+:::
+
+::: {.callout-tip title="Recap: code so far" collapse="true"}
+```{r}
+#| message: false
+dir.create("results", showWarnings = FALSE)
+dir.create(file.path("results", "tables"), recursive = TRUE, showWarnings = FALSE)
+dir.create(file.path("results", "figures"), recursive = TRUE, showWarnings = FALSE)
+
+
+library(DESeq2)
+library(pheatmap)
+
+count_data <- as.matrix(read.csv("m_sample_counts.csv", header = TRUE, row.names = 1, check.names = FALSE))
+sample_info <- read.csv("m_sample_info.csv", header = TRUE, row.names = 1, check.names = FALSE)
+sample_info <- sample_info[colnames(count_data), , drop = FALSE]
+sample_info$status <- factor(sample_info$status)
+
+dds <- DESeqDataSetFromMatrix(countData = count_data, colData = sample_info, design = ~ status)
+dds <- dds[rowSums(counts(dds)) >= 10, ]
+
+gene_annotation <- data.frame(gene_id = rownames(dds), stringsAsFactors = FALSE)
+annotation_file <- read.csv("human_annotations_from_orgHs.csv", check.names = FALSE, stringsAsFactors = FALSE)
+gene_annotation$symbol <- annotation_file$SYMBOL_SAFE[match(gene_annotation$gene_id, annotation_file$ENSEMBL)]
+missing_symbol <- is.na(gene_annotation$symbol) | gene_annotation$symbol == ""
+gene_annotation$symbol[missing_symbol] <- gene_annotation$gene_id[missing_symbol]
+
+dds <- DESeq(dds)
+res_hat_vs_sero <- results(dds, contrast = c("status", "hat", "sero"), alpha = 0.05)
+
+vsd <- vst(dds, blind = FALSE)
+vst_values <- assay(vsd)
+selected_samples <- colnames(vst_values)[sample_info[colnames(vst_values), "status"] %in% c("sero", "hat")]
+selected_vst <- vst_values[, selected_samples]
+
+result_data <- as.data.frame(res_hat_vs_sero)
+res_hat_vs_sero_table <- data.frame(
+  gene_id = rownames(result_data),
+  symbol = gene_annotation$symbol[match(rownames(result_data), gene_annotation$gene_id)],
+  result_data, row.names = NULL, check.names = FALSE, stringsAsFactors = FALSE
+)
+res_hat_vs_sero_table <- res_hat_vs_sero_table[order(res_hat_vs_sero_table$padj, na.last = TRUE), ]
+plot_de <- res_hat_vs_sero_table
+
+sample_annotation <- data.frame(status = sample_info[colnames(selected_vst), "status"])
+rownames(sample_annotation) <- colnames(selected_vst)
+```
+:::
+
+## Selecting genes and standardising expression
+
+We'll cluster the 100 most significant genes from the HAT-vs-SERO contrast.
+
+```{r}
+significant_de <- plot_de[!is.na(plot_de$padj) & plot_de$padj < 0.05, ]
+significant_de <- significant_de[order(significant_de$padj), ]
+heatmap_gene_ids <- head(significant_de$gene_id, 100)
+
+heatmap_matrix <- selected_vst[heatmap_gene_ids, , drop = FALSE]
+heatmap_z <- t(scale(t(heatmap_matrix)))
+heatmap_z <- heatmap_z[complete.cases(heatmap_z), , drop = FALSE]
+```
+
+::: {.callout-important}
+## Check your understanding
+Why are **two** transpose operations needed to scale by row with `scale()`, which normally scales by column? If a gene has a z-score of $+2$ in one sample, is that high relative to *all genes in the dataset*, or relative to *that gene's own mean across samples*?
+
+::: {.callout-tip title="Solution" collapse="true"}
+`scale()` always standardises columns. To standardise each **gene** (currently a row), we transpose so genes become columns, scale, and then transpose back so genes are rows again — hence `t(scale(t(heatmap_matrix)))`. A z-score of $+2$ means that sample's value is two standard deviations *above that gene's own mean*, calculated across samples — it says nothing about how that gene compares to other genes.
+:::
+:::
+
+## A hierarchically clustered heatmap
+
+```{r}
+heatmap_labels <- gene_annotation$symbol[match(rownames(heatmap_z), gene_annotation$gene_id)]
+heatmap_labels[is.na(heatmap_labels) | heatmap_labels == ""] <-
+  rownames(heatmap_z)[is.na(heatmap_labels) | heatmap_labels == ""]
+```
+
+::: {.callout-tip title="Click to reveal: what the heatmap should look like" collapse="true"}
+```{r}
+#| echo: false
+pheatmap(heatmap_z, labels_row = heatmap_labels, show_rownames = nrow(heatmap_z) <= 50, annotation_col = sample_annotation)
+```
+:::
+
+`pheatmap()` automatically performs **hierarchical clustering** on both rows and columns, and reorders them so similar genes/samples sit next to each other. This is different from k-means, which we'll use next.
+
+## K-means clustering
+
+```{r}
+set.seed(2026)
+kmeans_fit <- kmeans(heatmap_z, centers = 3, nstart = 25)
+```
+
+::: {.callout-note title="Analytical choice"}
+`centers = 3` is a reasonable starting point for exploration — it is **not** a biologically proven number of expression signatures. `nstart = 25` repeats the clustering from 25 different random starting points and keeps the best result, which makes the outcome more reproducible than a single run would be. `set.seed()` fixes R's random number generator so that, given the same data and the same `nstart`, you get the same answer every time you run this chunk.
+:::
+
+```{r}
+kmeans_membership <- data.frame(
+  gene_id = rownames(heatmap_z),
+  cluster = kmeans_fit$cluster,
+  symbol = gene_annotation$symbol[match(rownames(heatmap_z), gene_annotation$gene_id)],
+  stringsAsFactors = FALSE
+)
+
+table(kmeans_membership$cluster)
+
+write.csv(
+  kmeans_membership,
+  file.path("results", "tables", "T10_kmeans_membership.csv"),
+  row.names = FALSE
+)
+```
+
+::: {.callout-tip title="Try it yourself"}
+Using the same `heatmap_z` matrix and the same seed, compare `centers = 2`, `centers = 3`, and `centers = 4`. For each, record the cluster sizes (`table(kmeans_fit$cluster)`) and note whether the resulting groups look coherent and interpretable. Do not pick a value of $k$ just because one result *looks* nicer — be able to justify your choice.
+:::
+
+## Summary
+
+You've now:
+
+- standardised gene expression to z-scores and understood what that transformation means
+- built a hierarchically clustered heatmap
+- run k-means clustering with a reproducible seed and multiple starts
+- practised treating clustering as a hypothesis-generating tool, not a definitive answer
+
+In the next chapter, we move from statistics back to biology, using gene ontology enrichment to interpret our results.

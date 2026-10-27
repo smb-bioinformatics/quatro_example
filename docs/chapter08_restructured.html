@@ -1,0 +1,1996 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.38">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>8&nbsp; Exploring Relationships Among Samples – Bioinformatics with R</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<link href="./chapter09.html" rel="next">
+<link href="./chapter07_restructured.html" rel="prev">
+<script src="site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-33269adcf1721b81efc5ea7fcfe7f0ee.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-dark-5a2acb6f4ed5aeb23a104ba421924b87.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-33269adcf1721b81efc5ea7fcfe7f0ee.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap-82be1df1625442a14a32b67ca9799ca5.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="site_libs/bootstrap/bootstrap-dark-407db9a3e711352b026d38d8f50b5f87.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="site_libs/bootstrap/bootstrap-82be1df1625442a14a32b67ca9799ca5.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script src="https://unpkg.com/@popperjs/core@2"></script>
+<script src="https://unpkg.com/tippy.js@6"></script>
+<link rel="stylesheet" href="https://unpkg.com/tippy.js@6/animations/scale.css">
+
+
+<link rel="stylesheet" href="styles.css">
+</head>
+
+<body class="nav-sidebar floating quarto-light"><script id="quarto-html-before-body" type="application/javascript">
+    const toggleBodyColorMode = (bsSheetEl) => {
+      const mode = bsSheetEl.getAttribute("data-mode");
+      const bodyEl = window.document.querySelector("body");
+      if (mode === "dark") {
+        bodyEl.classList.add("quarto-dark");
+        bodyEl.classList.remove("quarto-light");
+      } else {
+        bodyEl.classList.add("quarto-light");
+        bodyEl.classList.remove("quarto-dark");
+      }
+    }
+    const toggleBodyColorPrimary = () => {
+      const bsSheetEl = window.document.querySelector("link#quarto-bootstrap:not([rel=disabled-stylesheet])");
+      if (bsSheetEl) {
+        toggleBodyColorMode(bsSheetEl);
+      }
+    }
+    const setColorSchemeToggle = (alternate) => {
+      const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+      for (let i=0; i < toggles.length; i++) {
+        const toggle = toggles[i];
+        if (toggle) {
+          if (alternate) {
+            toggle.classList.add("alternate");
+          } else {
+            toggle.classList.remove("alternate");
+          }
+        }
+      }
+    };
+    const toggleColorMode = (alternate) => {
+      // Switch the stylesheets
+      const primaryStylesheets = window.document.querySelectorAll('link.quarto-color-scheme:not(.quarto-color-alternate)');
+      const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+      manageTransitions('#quarto-margin-sidebar .nav-link', false);
+      if (alternate) {
+        // note: dark is layered on light, we don't disable primary!
+        enableStylesheet(alternateStylesheets);
+        for (const sheetNode of alternateStylesheets) {
+          if (sheetNode.id === "quarto-bootstrap") {
+            toggleBodyColorMode(sheetNode);
+          }
+        }
+      } else {
+        disableStylesheet(alternateStylesheets);
+        enableStylesheet(primaryStylesheets)
+        toggleBodyColorPrimary();
+      }
+      manageTransitions('#quarto-margin-sidebar .nav-link', true);
+      // Switch the toggles
+      setColorSchemeToggle(alternate)
+      // Hack to workaround the fact that safari doesn't
+      // properly recolor the scrollbar when toggling (#1455)
+      if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+        manageTransitions("body", false);
+        window.scrollTo(0, 1);
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+          manageTransitions("body", true);
+        }, 40);
+      }
+    }
+    const disableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        stylesheet.rel = 'disabled-stylesheet';
+      }
+    }
+    const enableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        if(stylesheet.rel !== 'stylesheet') { // for Chrome, which will still FOUC without this check
+          stylesheet.rel = 'stylesheet';
+        }
+      }
+    }
+    const manageTransitions = (selector, allowTransitions) => {
+      const els = window.document.querySelectorAll(selector);
+      for (let i=0; i < els.length; i++) {
+        const el = els[i];
+        if (allowTransitions) {
+          el.classList.remove('notransition');
+        } else {
+          el.classList.add('notransition');
+        }
+      }
+    }
+    const isFileUrl = () => {
+      return window.location.protocol === 'file:';
+    }
+    const hasAlternateSentinel = () => {
+      let styleSentinel = getColorSchemeSentinel();
+      if (styleSentinel !== null) {
+        return styleSentinel === "alternate";
+      } else {
+        return false;
+      }
+    }
+    const setStyleSentinel = (alternate) => {
+      const value = alternate ? "alternate" : "default";
+      if (!isFileUrl()) {
+        window.localStorage.setItem("quarto-color-scheme", value);
+      } else {
+        localAlternateSentinel = value;
+      }
+    }
+    const getColorSchemeSentinel = () => {
+      if (!isFileUrl()) {
+        const storageValue = window.localStorage.getItem("quarto-color-scheme");
+        return storageValue != null ? storageValue : localAlternateSentinel;
+      } else {
+        return localAlternateSentinel;
+      }
+    }
+    const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+      const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+      const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+      let newTheme = '';
+      if(authorPrefersDark) {
+        newTheme = isAlternate ? baseTheme : alternateTheme;
+      } else {
+        newTheme = isAlternate ? alternateTheme : baseTheme;
+      }
+      const changeGiscusTheme = () => {
+        // From: https://github.com/giscus/giscus/issues/336
+        const sendMessage = (message) => {
+          const iframe = document.querySelector('iframe.giscus-frame');
+          if (!iframe) return;
+          iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+        }
+        sendMessage({
+          setConfig: {
+            theme: newTheme
+          }
+        });
+      }
+      const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+      if (isGiscussLoaded) {
+        changeGiscusTheme();
+      }
+    };
+    const authorPrefersDark = false;
+    const darkModeDefault = authorPrefersDark;
+      document.querySelector('link#quarto-text-highlighting-styles.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+      document.querySelector('link#quarto-bootstrap.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+    let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+    // Dark / light mode switch
+    window.quartoToggleColorScheme = () => {
+      // Read the current dark / light value
+      let toAlternate = !hasAlternateSentinel();
+      toggleColorMode(toAlternate);
+      setStyleSentinel(toAlternate);
+      toggleGiscusIfUsed(toAlternate, darkModeDefault);
+      window.dispatchEvent(new Event('resize'));
+    };
+    // Switch to dark mode if need be
+    if (hasAlternateSentinel()) {
+      toggleColorMode(true);
+    } else {
+      toggleColorMode(false);
+    }
+  </script>
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./chapter08_restructured.html"><span class="chapter-number">8</span>&nbsp; <span class="chapter-title">Exploring Relationships Among Samples</span></a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <div class="pt-lg-2 mt-2 text-left sidebar-header">
+    <div class="sidebar-title mb-0 py-0">
+      <a href="./">Bioinformatics with R</a> 
+        <div class="sidebar-tools-main">
+    <div class="dropdown">
+      <a href="" title="Download" id="quarto-navigation-tool-dropdown-0" class="quarto-navigation-tool dropdown-toggle px-1" data-bs-toggle="dropdown" aria-expanded="false" role="link" aria-label="Download"><i class="bi bi-download"></i></a>
+      <ul class="dropdown-menu" aria-labelledby="quarto-navigation-tool-dropdown-0">
+          <li>
+            <a class="dropdown-item sidebar-tools-main-item" href="./Bioinformatics-with-R.pdf">
+              <i class="bi bi-file-pdf pe-1"></i>
+            Download PDF
+            </a>
+          </li>
+          <li>
+            <a class="dropdown-item sidebar-tools-main-item" href="./Bioinformatics-with-R.epub">
+              <i class="bi bi-journal pe-1"></i>
+            Download ePub
+            </a>
+          </li>
+      </ul>
+    </div>
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+    </div>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Overview</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapter01.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">1</span>&nbsp; <span class="chapter-title">Setting Up R and RStudio</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapter02.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">2</span>&nbsp; <span class="chapter-title">Getting Started with the HAT dataset</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapter03.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">3</span>&nbsp; <span class="chapter-title">Sample-Level Summaries and Visualisation</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapter04.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">4</span>&nbsp; <span class="chapter-title">Transforming and Reshaping Data</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapter05_restructured.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">5</span>&nbsp; <span class="chapter-title">Preparing Data for Differential-Expression Analysis</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapter06_restructured.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">6</span>&nbsp; <span class="chapter-title">Fitting and Interpreting the Differential-Expression Model</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapter07_restructured.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">7</span>&nbsp; <span class="chapter-title">Exploring and Annotating Gene-Level Results</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapter08_restructured.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text"><span class="chapter-number">8</span>&nbsp; <span class="chapter-title">Exploring Relationships Among Samples</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapter09.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">9</span>&nbsp; <span class="chapter-title">Customising Data Visualisations</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapter10.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">10</span>&nbsp; <span class="chapter-title">Assessment Workshop and R Catch-up</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapter11.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">11</span>&nbsp; <span class="chapter-title">Pattern discovery, hierarchical clustering and heatmaps</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapter12.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">12</span>&nbsp; <span class="chapter-title">Gene-expression signatures</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapter13.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">13</span>&nbsp; <span class="chapter-title">Functional Enrichment Analysis</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapter14.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">14</span>&nbsp; <span class="chapter-title">Comparing Multiple Groups and Contrasts</span></span></a>
+  </div>
+</li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Table of contents</h2>
+   
+  <ul>
+  <li><a href="#what-youll-learn" id="toc-what-youll-learn" class="nav-link active" data-scroll-target="#what-youll-learn"><span class="header-section-number">8.1</span> What you’ll learn</a></li>
+  <li><a href="#continue-from-the-previous-chapters" id="toc-continue-from-the-previous-chapters" class="nav-link" data-scroll-target="#continue-from-the-previous-chapters"><span class="header-section-number">8.2</span> Continue from the previous chapters</a></li>
+  <li><a href="#variance-stabilising-transformation" id="toc-variance-stabilising-transformation" class="nav-link" data-scroll-target="#variance-stabilising-transformation"><span class="header-section-number">8.3</span> Variance-stabilising transformation</a></li>
+  <li><a href="#select-hat-and-sero-tl-samples" id="toc-select-hat-and-sero-tl-samples" class="nav-link" data-scroll-target="#select-hat-and-sero-tl-samples"><span class="header-section-number">8.4</span> Select HAT and SERO TL+ samples</a></li>
+  <li><a href="#verify-the-selected-samples" id="toc-verify-the-selected-samples" class="nav-link" data-scroll-target="#verify-the-selected-samples"><span class="header-section-number">8.5</span> Verify the selected samples</a></li>
+  <li><a href="#calculate-the-pca" id="toc-calculate-the-pca" class="nav-link" data-scroll-target="#calculate-the-pca"><span class="header-section-number">8.6</span> Calculate the PCA</a></li>
+  <li><a href="#plot-the-pca" id="toc-plot-the-pca" class="nav-link" data-scroll-target="#plot-the-pca"><span class="header-section-number">8.7</span> Plot the PCA</a></li>
+  <li><a href="#save-the-pca-plot" id="toc-save-the-pca-plot" class="nav-link" data-scroll-target="#save-the-pca-plot"><span class="header-section-number">8.8</span> Save the PCA plot</a></li>
+  <li><a href="#examine-distances-between-samples" id="toc-examine-distances-between-samples" class="nav-link" data-scroll-target="#examine-distances-between-samples"><span class="header-section-number">8.9</span> Examine distances between samples</a></li>
+  <li><a href="#display-the-sample-distances-as-a-heatmap" id="toc-display-the-sample-distances-as-a-heatmap" class="nav-link" data-scroll-target="#display-the-sample-distances-as-a-heatmap"><span class="header-section-number">8.10</span> Display the sample distances as a heatmap</a></li>
+  <li><a href="#save-the-sample-distance-heatmap" id="toc-save-the-sample-distance-heatmap" class="nav-link" data-scroll-target="#save-the-sample-distance-heatmap"><span class="header-section-number">8.11</span> Save the sample-distance heatmap</a></li>
+  <li><a href="#integrate-the-evidence" id="toc-integrate-the-evidence" class="nav-link" data-scroll-target="#integrate-the-evidence"><span class="header-section-number">8.12</span> Integrate the evidence</a></li>
+  <li><a href="#summary" id="toc-summary" class="nav-link" data-scroll-target="#summary"><span class="header-section-number">8.13</span> Summary</a></li>
+  <li><a href="#optional-extra-activities" id="toc-optional-extra-activities" class="nav-link" data-scroll-target="#optional-extra-activities"><span class="header-section-number">8.14</span> Optional extra activities</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title"><span class="chapter-number">8</span>&nbsp; <span class="chapter-title">Exploring Relationships Among Samples</span></h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<style>
+  .tooltip-text {
+    text-decoration: underline dotted #4a5568 2px; /* Dotted line under the word */
+    text-underline-offset: 3px;                     /* Gives space between text and line */
+    cursor: help;                                  /* Changes mouse pointer to a '?' cursor */
+    background-color: #f7fafc;                     /* Optional subtle background highlight */
+    padding: 0 2px;
+    border-radius: 2px;
+  }
+  
+  .tooltip-text:hover {
+    background-color: #e2e8f0;                     /* Highlight on mouseover */
+  }
+</style>
+<p><link rel="stylesheet" href="https://unpkg.com/tippy.js@6/themes/light.css"></p>
+<section id="what-youll-learn" class="level2" data-number="8.1">
+<h2 data-number="8.1" class="anchored" data-anchor-id="what-youll-learn"><span class="header-section-number">8.1</span> What you’ll learn</h2>
+<p>In <a href="./chapter07_restructured.html">Chapter 7</a>, we used MA and volcano plots to examine gene-level evidence and added gene symbols so that the results could be interpreted biologically. We are now going to ask a different but complementary question:</p>
+<p><strong>Do samples with the same biological status have similar overall expression profiles, and are any samples unusual?</strong></p>
+<p>In the MA and volcano plots, each data point represented a <strong>gene</strong>. In this session, each point will represent a <strong>sample</strong>. To do this, we will use a few commonly applied methods methods for examining sample relationships, including a principal component analysis (PCA) and a sample-distance heatmap.</p>
+<div class="callout callout-style-default callout-note callout-titled" title="Learning outcomes">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Learning outcomes
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>By the end of this session, you should be able to:</p>
+<ul>
+<li>distinguish gene-level and sample-level questions</li>
+<li>explain why VST values are used for exploratory sample comparisons</li>
+<li>create and interpret a PCA plot</li>
+<li>calculate and visualise distances between samples</li>
+<li>combine gene-level and sample-level evidence into a cautious biological interpretation</li>
+</ul>
+<p><strong>ISCB alignment:</strong> A3 (interpret sample-level patterns in their biological and technical context), C3 (integrate gene-level and sample-level evidence), D3 (apply VST, PCA and pairwise distances to high-dimensional RNA-seq data), E3 (reload, validate and manage derived analysis objects and figures), F3 (use appropriate transformation and exploratory-analysis functions), H3 (select, transform, reshape and visualise data in R), K3 (communicate multivariate patterns cautiously and identify samples requiring further investigation).</p>
+</div>
+</div>
+</section>
+<section id="continue-from-the-previous-chapters" class="level2" data-number="8.2">
+<h2 data-number="8.2" class="anchored" data-anchor-id="continue-from-the-previous-chapters"><span class="header-section-number">8.2</span> Continue from the previous chapters</h2>
+<p><a href="./chapter07_restructured.html">Chapter 7</a> explored gene-level results from the fitted model. In this session, we will reload the model saved in <a href="./chapter06_restructured.html">Chapter 6</a> and derive the sample metadata from it so this session can run after restarting R.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(DESeq2)</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ggplot2)</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>dds_fitted <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(<span class="st">"objects/dds_fitted.rds"</span>)</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>sample_info <span class="ot">&lt;-</span> <span class="fu">as.data.frame</span>(<span class="fu">colData</span>(dds_fitted))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</section>
+<section id="variance-stabilising-transformation" class="level2" data-number="8.3">
+<h2 data-number="8.3" class="anchored" data-anchor-id="variance-stabilising-transformation"><span class="header-section-number">8.3</span> Variance-stabilising transformation</h2>
+<p>In <a href="./chapter04.html">Chapter 4</a>, we used <code>log2(count + 1)</code> to compress a strongly skewed range of count values. However, genes with larger RNA-seq counts also tend to show greater numerical variation among samples. This can cause high-count genes to dominate comparisons between samples.</p>
+<p><code>DESeq2</code> provides a transformation designed for this purpose called the <strong>variance-stabilising transformation</strong>, or VST. VST reduces the relationship between a gene’s average expression and its variability, while accounting for differences in sequencing depth. You do not need to understand the mathematical details here. The important idea is that VST values are more suitable for exploratory comparisons among samples, including PCA and sample-distance heatmaps.</p>
+<p>As with the earlier log2 transformation, VST values are used for exploratory analysis and visualisation. The differential-expression model continues to use the original count data.</p>
+<p>We can transform the count data in our <code>dds_fitted</code> object with the <code>vst()</code> function and store the data in a new object called <code>vsd</code>:</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>vsd <span class="ot">&lt;-</span> <span class="fu">vst</span>(dds_fitted, <span class="at">blind =</span> <span class="cn">FALSE</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div class="callout callout-style-default callout-warning callout-titled" title="Why use `blind = FALSE`?">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>Why use <code>blind = FALSE</code>?
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>blind = FALSE</code> allows the transformation to use the fitted experimental design when estimating the mean–variance relationship. This is appropriate here because the design is already known and we are transforming the data for downstream exploration.</p>
+<p>The group labels do not directly determine the PCA coordinates or force the samples apart.</p>
+</div>
+</div>
+<p>It is worth checking that the transformed <code>vsd</code> object and <code>sample_info</code> contain the same sample identifiers in the same order. We can use the <code>identical()</code> function to check whether the sample names in <code>vsd</code> and <code>sample_info</code> are exactly the same and in the same order. Try this without looking back first. If you get stuck, open the solution.</p>
+<p><em>Hint: The sample names are the column names of <code>vsd</code> and the row names of <code>sample_info</code>.</em></p>
+<div class="callout callout-style-default callout-tip callout-titled" title="Suggested answer">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-3-contents" aria-controls="callout-3" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Suggested answer
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-3" class="callout-3-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">identical</span>(</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">colnames</span>(vsd),</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rownames</span>(sample_info)</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>This should return <code>TRUE</code>, confirming that the transformed values and sample information use the same samples in the same order.</p>
+</div>
+</div>
+</div>
+</section>
+<section id="select-hat-and-sero-tl-samples" class="level2" data-number="8.4">
+<h2 data-number="8.4" class="anchored" data-anchor-id="select-hat-and-sero-tl-samples"><span class="header-section-number">8.4</span> Select HAT and SERO TL+ samples</h2>
+<p>During our analysis, we are focusing on the HAT vs SERO TL+ comparison so we will need to select samples from those groups from the <code>vsd</code>. We can use the information in <code>sample_info</code> to obtain the names of samples in the groups we want:</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>selected_samples <span class="ot">&lt;-</span> <span class="fu">rownames</span>(sample_info)[</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  sample_info<span class="sc">$</span>status <span class="sc">==</span> <span class="st">"sero"</span> <span class="sc">|</span> sample_info<span class="sc">$</span>status <span class="sc">==</span> <span class="st">"hat"</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>]</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>selected_samples</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code> [1] "h1.1"  "h1.2"  "h1.3"  "h1.5"  "h2.2"  "h2.3"  "h2.4"  "h2.5"  "h2.6" 
+[10] "shi.1" "shi.2" "slo.1" "slo.5" "slo.6" "slo.7"</code></pre>
+</div>
+</div>
+<p>In this statement, R asks two questions for each sample:</p>
+<ol type="1">
+<li>Is the sample’s status <code>"sero"</code>?</li>
+<li>Is the sample’s status <code>"hat"</code>?</li>
+</ol>
+<p>The <code>|</code> symbol means <strong>OR</strong>, so only one of these questions needs to have the answer <code>TRUE</code>.</p>
+<p>A sample is therefore selected if its status is <code>"sero"</code> or <code>"hat"</code>. Samples with any other status are not selected. Finally, the square brackets use these <code>TRUE</code> and <code>FALSE</code> results to keep the names of the selected samples. Make sure that all the samples marked as HAT or SERO TL+ in the data are in the new vector.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">all</span>(selected_samples <span class="sc">%in%</span> <span class="fu">colnames</span>(vsd))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] TRUE</code></pre>
+</div>
+</div>
+<p>The check should return <code>TRUE</code>. We can select the columns directly by their sample names:</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>selected_vsd <span class="ot">&lt;-</span> vsd[, selected_samples]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</section>
+<section id="verify-the-selected-samples" class="level2" data-number="8.5">
+<h2 data-number="8.5" class="anchored" data-anchor-id="verify-the-selected-samples"><span class="header-section-number">8.5</span> Verify the selected samples</h2>
+<p>It is worth verifying the data after subsetting to make sure nothing has gone wrong. For example, We can use <code>dim()</code> to report the numbers of rows and columns, <code>colnames()</code> to display the sample names, and <code>table()</code> to summarise the <code>status</code> variable:</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="fu">dim</span>(selected_vsd)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 30076    15</code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="fu">colnames</span>(selected_vsd)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code> [1] "h1.1"  "h1.2"  "h1.3"  "h1.5"  "h2.2"  "h2.3"  "h2.4"  "h2.5"  "h2.6" 
+[10] "shi.1" "shi.2" "slo.1" "slo.5" "slo.6" "slo.7"</code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="fu">table</span>(<span class="fu">colData</span>(selected_vsd)<span class="sc">$</span>status)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+ctrl  hat sero 
+   0    9    6 </code></pre>
+</div>
+</div>
+<p>Do all these values match what you would expect for a data set containing only HAT and SERO TL+ samples? (Note: The control category still appears with a count of zero in the output table because the factor remembers all original group labels, even though no control samples remain).</p>
+<p>If everything is expected, we can move on to preparing the PCA.</p>
+</section>
+<section id="calculate-the-pca" class="level2" data-number="8.6">
+<h2 data-number="8.6" class="anchored" data-anchor-id="calculate-the-pca"><span class="header-section-number">8.6</span> Calculate the PCA</h2>
+<p>A PCA summarises the major patterns of variation across many genes. We will use DESeq2’s <code>plotPCA()</code> function to prepare the PCA data that we will plot with <code>ggplot2</code>:</p>
+<ul>
+<li>each point represents one sample</li>
+<li>samples with more similar expression profiles appear closer together</li>
+<li>samples with less similar expression profiles appear farther apart</li>
+</ul>
+<p>We will store the PCA in a new object called pca_data:</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>pca_data <span class="ot">&lt;-</span> <span class="fu">plotPCA</span>(</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>  selected_vsd,</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">intgroup =</span> <span class="st">"status"</span>,</span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">ntop =</span> <span class="dv">500</span>,</span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">returnData =</span> <span class="cn">TRUE</span></span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>using ntop=500 top features by variance</code></pre>
+</div>
+</div>
+<ul>
+<li><code>selected_vsd</code> specifies the variance-stabilised expression data for the selected samples.</li>
+<li><code>intgroup = "status"</code> retrieves the status for each sample so that this meta-information can be used when plotting the PCA</li>
+<li><code>returnData = TRUE</code> tells plotPCA() to return the PCA coordinates and sample information as a data frame rather than drawing it immediately</li>
+<li><code>ntop = 500</code> tells plotPCA() to calculate the PCA using the 500 genes with the greatest variation across the selected samples</li>
+</ul>
+<p>Genes that barely vary across the samples provide little information about how the samples differ. <code>plotPCA()</code> therefore focuses on the genes that vary most across the selected samples, often the 500 most variable genes. The number 500 is a <em>practical</em> default rather than a strict biological rule. It includes enough genes to represent broad expression patterns while reducing the influence of thousands of genes that change very little.</p>
+<p>The returned data frame contains one row for each sample:</p>
+<ul>
+<li><code>PC1</code> gives the horizontal coordinate of each sample</li>
+<li><code>PC2</code> gives the vertical coordinate of each sample</li>
+<li><code>group</code> contains the sample status</li>
+<li><code>name</code> contains the sample identifier</li>
+</ul>
+</section>
+<section id="plot-the-pca" class="level2" data-number="8.7">
+<h2 data-number="8.7" class="anchored" data-anchor-id="plot-the-pca"><span class="header-section-number">8.7</span> Plot the PCA</h2>
+<p>We now have everything we need to plot the PCA using <code>ggplot2</code>.</p>
+<div class="callout callout-style-default callout-tip callout-titled" title="Try it yourself: Create the PCA plot">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Try it yourself: Create the PCA plot
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Previously, we have built plots using this general structure:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>a_plot <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(</span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">data =</span> a_data_frame,</span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">mapping =</span> <span class="fu">aes</span>(</span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> an_x_variable,</span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> a_y_variable</span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>) <span class="sc">+</span></span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">a_geom</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>We will reuse that structure with <code>geom_point()</code>, similar to the volcano plot in <a href="./chapter07_restructured.html">Chapter 7</a>. Complete the code and then run it by replacing the blanks with the names below. Try this without looking back first. If you get stuck, open the suggested answers</p>
+<ul>
+<li><code>pca_data</code></li>
+<li><code>PC1</code></li>
+<li><code>PC2</code></li>
+<li><code>group</code></li>
+</ul>
+<p>Remember:</p>
+<ul>
+<li>the first argument to <code>ggplot()</code> is the data frame</li>
+<li><code>x</code> controls horizontal position</li>
+<li><code>y</code> controls vertical position</li>
+<li><code>colour</code> identifies the sample groups</li>
+</ul>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>pca_plot <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>  ___________________,</span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">aes</span>(</span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> __________,</span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> __________,</span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">colour =</span> __________</span>
+<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a>) <span class="sc">+</span></span>
+<span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>()</span>
+<span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-11"><a href="#cb18-11" aria-hidden="true" tabindex="-1"></a>pca_plot</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Suggested answer">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-5-contents" aria-controls="callout-5" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Suggested answer
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-5" class="callout-5-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>pca_plot <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(</span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>  pca_data,</span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">aes</span>(</span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> PC1,</span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> PC2,</span>
+<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">colour =</span> group</span>
+<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb19-8"><a href="#cb19-8" aria-hidden="true" tabindex="-1"></a>) <span class="sc">+</span></span>
+<span id="cb19-9"><a href="#cb19-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>()</span>
+<span id="cb19-10"><a href="#cb19-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-11"><a href="#cb19-11" aria-hidden="true" tabindex="-1"></a>pca_plot</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="chapter08_restructured_files/figure-html/unnamed-chunk-8-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<p>The PCA plot shows the samples along the first two principal components, PC1 and PC2.</p>
+<p>The percentage for each axis tells us how much of the overall variation among samples is represented by that principal component. This helps us judge how much of the dataset is summarised by the plot.</p>
+<p>We can extract these percentages so that we can include them in the axis labels using an additional ggplot2 layer (you do not need to memorise all of the code):</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Calculate the percentage variation represented by PC1 and PC2</span></span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>pc1_percent <span class="ot">&lt;-</span> <span class="fu">round</span>(</span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>  <span class="dv">100</span> <span class="sc">*</span> <span class="fu">attr</span>(pca_data, <span class="st">"percentVar"</span>)[<span class="dv">1</span>],</span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>  <span class="dv">1</span></span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a>pc2_percent <span class="ot">&lt;-</span> <span class="fu">round</span>(</span>
+<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a>  <span class="dv">100</span> <span class="sc">*</span> <span class="fu">attr</span>(pca_data, <span class="st">"percentVar"</span>)[<span class="dv">2</span>],</span>
+<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a>  <span class="dv">1</span></span>
+<span id="cb20-10"><a href="#cb20-10" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb20-11"><a href="#cb20-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-12"><a href="#cb20-12" aria-hidden="true" tabindex="-1"></a><span class="co">#add them to the pca plot</span></span>
+<span id="cb20-13"><a href="#cb20-13" aria-hidden="true" tabindex="-1"></a>pca_plot <span class="ot">&lt;-</span> pca_plot <span class="sc">+</span></span>
+<span id="cb20-14"><a href="#cb20-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb20-15"><a href="#cb20-15" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="fu">paste0</span>(<span class="st">"PC1 ("</span>, pc1_percent, <span class="st">"%)"</span>),</span>
+<span id="cb20-16"><a href="#cb20-16" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="fu">paste0</span>(<span class="st">"PC2 ("</span>, pc2_percent, <span class="st">"%)"</span>)</span>
+<span id="cb20-17"><a href="#cb20-17" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb20-18"><a href="#cb20-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-19"><a href="#cb20-19" aria-hidden="true" tabindex="-1"></a>pca_plot</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="chapter08_restructured_files/figure-html/unnamed-chunk-9-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Try it yourself: Interpret the PCA plot">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Try it yourself: Interpret the PCA plot
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Examine the plot and discuss these questions with a partner before revealing the suggested answers:</p>
+<p><strong>Read the plot</strong></p>
+<ol type="1">
+<li>What does each point represent?</li>
+<li>How much variation is represented by PC1 and PC2 individually?</li>
+<li>How much variation do PC1 and PC2 represent together?</li>
+</ol>
+<p><strong>Describe the pattern</strong></p>
+<ol start="4" type="1">
+<li>Along which axis are the HAT and SERO TL+ samples separated most clearly?</li>
+<li>Is the separation between the two groups complete, partial or absent?</li>
+<li>Is there still variation among samples belonging to the same group?</li>
+</ol>
+<p><strong>Interpret the biology</strong></p>
+<ol start="7" type="1">
+<li>What does the separation suggest about the relationship between sample status and overall gene expression?</li>
+<li>Does PC1 representing 27.2% mean that disease status explains exactly 27.2% of the variation? Explain your answer.</li>
+</ol>
+<p>Complete the interpretation below (you could add it as a comment in your script to remind yourself):</p>
+<p><code># PC1 represents _____% of the variation among the samples. The separation along PC1 suggests that __________. However, __________.</code></p>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Suggested answers">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-7-contents" aria-controls="callout-7" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Suggested answers
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-7" class="callout-7-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<ol type="1">
+<li><p>Each point represents one biological sample. The position of each point summarises the expression values of the 500 most variable genes in that sample.</p></li>
+<li><p>PC1 represents <strong>27.2%</strong>, while PC2 represents <strong>17.4%</strong>, of the variation among the samples.</p></li>
+<li><p>Together, PC1 and PC2 represent:</p>
+<pre class="text"><code>27.2% + 17.4% = 44.6%</code></pre>
+<p>The remaining variation is represented by other principal components that are not shown in this plot.</p></li>
+<li><p>The HAT and SERO TL+ samples are separated most clearly along <strong>PC1</strong>, the horizontal axis.</p></li>
+<li><p>The groups do not overlap along PC1 in this displayed two-dimensional projection. All HAT samples have negative PC1 values, while all SERO TL+ samples have positive PC1 values.</p></li>
+<li><p>Yes. Samples within each group have different positions, particularly along PC2. This shows that samples belonging to the same status group do not have identical expression profiles.</p></li>
+<li><p>The separation suggests that sample status is associated with an important pattern in overall gene expression. This is consistent with HAT and SERO TL+ samples having different expression profiles across many genes.</p></li>
+<li><p>No.&nbsp;PC1 captures 27.2% of all the variation represented by these genes but the PCA does not tell us how much of that variation was caused by disease status. Disease status is associated with position along PC1 but other biological or technical factors could also contribute to the same axis.</p></li>
+</ol>
+<p>A possible interpretation is:</p>
+<p><code># PC1 represents 27.2% of the variation among the samples. HAT and SERO TL+ samples do not overlap along PC1 in the displayed PCA, suggests that status is associated with an important pattern in overall gene expression. However, the PCA does not demonstrate that disease status caused the pattern, and other biological or technical factors may also contribute to the variation</code>.</p>
+</div>
+</div>
+</div>
+</section>
+<section id="save-the-pca-plot" class="level2" data-number="8.8">
+<h2 data-number="8.8" class="anchored" data-anchor-id="save-the-pca-plot"><span class="header-section-number">8.8</span> Save the PCA plot</h2>
+<p>The PCA plot currently only exists as an object in the R Environment. To use the plot outside R, we can save it as an image using the <code>ggsave()</code> function. Try to recall the code from previous chapters to save the <code>pca_plot</code> as <code>PCA_sero_hat.png</code> into the <code>figures</code> output directory.</p>
+<div class="callout callout-style-default callout-tip callout-titled" title="Suggested answers">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-8-contents" aria-controls="callout-8" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Suggested answers
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-8" class="callout-8-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggsave</span>(</span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">filename =</span> <span class="st">"figures/PCA_sero_hat.png"</span>,</span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">plot =</span> pca_plot</span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Saving 7 x 5 in image</code></pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section id="examine-distances-between-samples" class="level2" data-number="8.9">
+<h2 data-number="8.9" class="anchored" data-anchor-id="examine-distances-between-samples"><span class="header-section-number">8.9</span> Examine distances between samples</h2>
+<p>PCA compresses the variation among samples into a small number of axes. This makes broad patterns easier to see but a two-dimensional PCA plot does not display all the variation in the data. A sample-distance matrix can provide a complementary view by comparing samples across all the VST-transformed genes:</p>
+<ul>
+<li>a smaller distance means that two samples have more similar expression profiles</li>
+<li>a larger distance means that two samples have less similar expression profiles</li>
+<li>the distance between a sample and itself is zero</li>
+</ul>
+<p>This allows us to examine individual sample pairs and ask whether samples from the same status group are generally more similar to one another. It can also help identify samples that differ from the other members of their group that may need to be investigated in more detail.</p>
+<p>We can use <code>dist()</code> function to calculate the distances between samples and then compare the result with the pattern observed in the PCA.</p>
+<p><strong>Prepare the values for the distance calculation</strong></p>
+<p>For the PCA, we created <code>selected_vsd</code>, which contains the transformed expression values and sample information for the HAT and SERO TL+ samples. However, <code>dist()</code> requires a numeric matrix. We must therefore extract the transformed expression values using the <code>assay()</code> accessor:</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb24"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>selected_vst <span class="ot">&lt;-</span> <span class="fu">assay</span>(selected_vsd)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p><code>selected_vst</code> contains <strong>just the transformed expression values</strong> in a matrix. Unlike <code>selected_vsd</code>, there is no sample information.</p>
+<ul>
+<li>each row represents one gene</li>
+<li>each column represents one sample</li>
+</ul>
+<p>However, <code>dist()</code> calculates distances between rows. We want to compare samples, so samples must be in rows and genes must be in columns. We therefore <strong>transpose</strong> the matrix using the <code>t()</code> function:</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb25"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>sample_by_gene <span class="ot">&lt;-</span> <span class="fu">t</span>(selected_vst)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p>We can now calculate the distance between each sample and every other sample. The <code>dist()</code> function stores its result in a specialised compact format, so we use <code>as.matrix()</code> to convert it into a standard matrix containing the distance for every pair of samples:</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb26"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a>sample_dist_matrix <span class="ot">&lt;-</span> <span class="fu">as.matrix</span>(</span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">dist</span>(sample_by_gene)</span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-5"><a href="#cb26-5" aria-hidden="true" tabindex="-1"></a>sample_dist_matrix[<span class="dv">1</span><span class="sc">:</span><span class="dv">5</span>, <span class="dv">1</span><span class="sc">:</span><span class="dv">5</span>]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>         h1.1     h1.2     h1.3     h1.5     h2.2
+h1.1  0.00000 74.00000 71.22884 75.22306 81.09497
+h1.2 74.00000  0.00000 81.19974 85.40769 86.75288
+h1.3 71.22884 81.19974  0.00000 74.79282 79.87624
+h1.5 75.22306 85.40769 74.79282  0.00000 87.46169
+h2.2 81.09497 86.75288 79.87624 87.46169  0.00000</code></pre>
+</div>
+</div>
+<p>By default, <code>dist()</code> uses <strong>Euclidean distance</strong>. This combines the differences across all genes into one distance value for each pair of samples. <strong>You do not need to calculate this by hand</strong>.</p>
+<p>In the resulting matrix:</p>
+<ul>
+<li>each cell contains the distance between two samples</li>
+<li>smaller values indicate more similar expression profiles</li>
+<li>larger values indicate less similar expression profiles</li>
+<li>the diagonal is zero because each sample is identical to itself</li>
+<li>the matrix is symmetrical because the distance from sample A to sample B is the same as the distance from sample B to sample A.</li>
+</ul>
+<p><strong>Prepare the distances for plotting</strong></p>
+<p>In Chapter 3, we used <code>stack()</code> to <em>reshape</em> a <strong>wide format</strong> gene-count matrix into a <strong>long format</strong> data frame for <code>ggplot()</code>. The same principle applies here, but each distance is associated with <strong>two sample names</strong></p>
+<ul>
+<li>the sample named by the matrix <strong>row</strong></li>
+<li>the sample named by the matrix <strong>column</strong></li>
+</ul>
+<p>Instead of <code>stack()</code>, we use <code>as.table()</code> because it collects the matrix cells into rows while retaining both sample names:</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb28"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a>distance_data <span class="ot">&lt;-</span> <span class="fu">as.data.frame</span>(</span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">as.table</span>(sample_dist_matrix)</span>
+<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-5"><a href="#cb28-5" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(distance_data)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>  Var1 Var2     Freq
+1 h1.1 h1.1  0.00000
+2 h1.2 h1.1 74.00000
+3 h1.3 h1.1 71.22884
+4 h1.5 h1.1 75.22306
+5 h2.2 h1.1 81.09497
+6 h2.3 h1.1 76.75551</code></pre>
+</div>
+</div>
+<p>The resulting data frame initially has three columns:</p>
+<ul>
+<li><code>Var1</code>: the sample from the matrix row</li>
+<li><code>Var2</code>: the sample from the matrix column</li>
+<li><code>Freq</code>: the distance between those samples</li>
+</ul>
+<p>Just like after <code>stack()</code>, these names are not very informative so we will replace them:</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb30"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="fu">colnames</span>(distance_data) <span class="ot">&lt;-</span> <span class="fu">c</span>(</span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a>  <span class="st">"sample_1"</span>,</span>
+<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a>  <span class="st">"sample_2"</span>,</span>
+<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a>  <span class="st">"distance"</span></span>
+<span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb30-6"><a href="#cb30-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-7"><a href="#cb30-7" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(distance_data)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>  sample_1 sample_2 distance
+1     h1.1     h1.1  0.00000
+2     h1.2     h1.1 74.00000
+3     h1.3     h1.1 71.22884
+4     h1.5     h1.1 75.22306
+5     h2.2     h1.1 81.09497
+6     h2.3     h1.1 76.75551</code></pre>
+</div>
+</div>
+<p>Each row of <code>distance_data</code> now represents one pair of samples and contains the distance between their transformed expression profiles.</p>
+<div class="callout callout-style-default callout-tip callout-titled" title="Try it yourself: Interpret the distance data">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Try it yourself: Interpret the distance data
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Examine the first few rows of <code>distance_data</code> and answer these questions before revealing the suggested answers:</p>
+<ol type="1">
+<li>What does one row represent?</li>
+<li>Which columns identify the two samples being compared?</li>
+<li>Which column contains the distance between them?</li>
+<li>What would a relatively small distance mean?</li>
+</ol>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Suggested answers">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-10-contents" aria-controls="callout-10" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Suggested answers
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-10" class="callout-10-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<ol type="1">
+<li><p>One row represents one comparison between a pair of samples.</p></li>
+<li><p><code>sample_1</code> and <code>sample_2</code> identify the two samples being compared. These were the row and column names in the original distance matrix.</p></li>
+<li><p><code>distance</code> contains the calculated distance between their transformed expression profiles.</p></li>
+<li><p>A relatively small distance means that the two samples have more similar expression profiles across the VST-transformed genes retained in `<code>selected_vsd</code>.</p></li>
+</ol>
+</div>
+</div>
+</div>
+</section>
+<section id="display-the-sample-distances-as-a-heatmap" class="level2" data-number="8.10">
+<h2 data-number="8.10" class="anchored" data-anchor-id="display-the-sample-distances-as-a-heatmap"><span class="header-section-number">8.10</span> Display the sample distances as a heatmap</h2>
+<p>The distance matrix contains all the pairwise sample comparisons, but a large table of numbers is difficult for us to interpret. A heatmap displays the same values using colour and makes broader patterns easier to identify.</p>
+<p>We can use the heatmap to look for:</p>
+<ul>
+<li>groups of samples with relatively small distances</li>
+<li>samples with relatively large distances</li>
+<li>whether samples from the same status group tend to have similar expression profiles</li>
+<li>samples that differ from the other members of their group</li>
+</ul>
+<p>The heatmap does not calculate any new distances. It is just a visual representation of the distances we have already calculated.</p>
+<p>For previous <code>ggplot2</code> figures, we used several different functions to plot different graphs, such as <code>geom_point()</code> and <code>geom_boxplot()</code>. For a heatmap, we use <code>geom_tile()</code> to draw a rectangular tile for every row of <code>distance_data</code>.</p>
+<p>For this plot:</p>
+<ul>
+<li><code>x</code> identifies the first sample</li>
+<li><code>y</code> identifies the second sample</li>
+<li><code>fill</code> controls the colour of the tile</li>
+<li>each tile represents the distance between one pair of samples</li>
+</ul>
+<div class="callout callout-style-default callout-tip callout-titled" title="Try it yourself: Re-arrange the heatmap code">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Try it yourself: Re-arrange the heatmap code
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The lines below are in the wrong order. Before revealing the solution, try and rearrange them to create a heatmap in which:</p>
+<ul>
+<li><code>sample_1</code> is displayed on the horizontal axis</li>
+<li><code>sample_2</code> is displayed on the vertical axis</li>
+<li><code>distance</code> controls the tile colour</li>
+</ul>
+<p>Use the structure of earlier <code>ggplot2</code> figures to help:</p>
+<ol type="1">
+<li>create and name the plot</li>
+<li>supply the plotting data</li>
+<li>map the columns to visual features using <code>aes()</code></li>
+<li>add the geometry</li>
+<li>display the completed plot</li>
+</ol>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb32"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_tile</span>()</span>
+<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a>distance_plot</span>
+<span id="cb32-4"><a href="#cb32-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb32-5"><a href="#cb32-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">aes</span>(</span>
+<span id="cb32-6"><a href="#cb32-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> sample_1,</span>
+<span id="cb32-7"><a href="#cb32-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> sample_2,</span>
+<span id="cb32-8"><a href="#cb32-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">fill =</span> distance</span>
+<span id="cb32-9"><a href="#cb32-9" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb32-10"><a href="#cb32-10" aria-hidden="true" tabindex="-1"></a><span class="er">)</span> <span class="sc">+</span></span>
+<span id="cb32-11"><a href="#cb32-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb32-12"><a href="#cb32-12" aria-hidden="true" tabindex="-1"></a>distance_plot <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(</span>
+<span id="cb32-13"><a href="#cb32-13" aria-hidden="true" tabindex="-1"></a>  distance_data,</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Suggested answer">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-12-contents" aria-controls="callout-12" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Suggested answer
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-12" class="callout-12-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb33"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a>distance_plot <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(</span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a>  distance_data,</span>
+<span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">aes</span>(</span>
+<span id="cb33-4"><a href="#cb33-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> sample_1,</span>
+<span id="cb33-5"><a href="#cb33-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> sample_2,</span>
+<span id="cb33-6"><a href="#cb33-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">fill =</span> distance</span>
+<span id="cb33-7"><a href="#cb33-7" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb33-8"><a href="#cb33-8" aria-hidden="true" tabindex="-1"></a>) <span class="sc">+</span></span>
+<span id="cb33-9"><a href="#cb33-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_tile</span>()</span>
+<span id="cb33-10"><a href="#cb33-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-11"><a href="#cb33-11" aria-hidden="true" tabindex="-1"></a>distance_plot</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="chapter08_restructured_files/figure-html/unnamed-chunk-16-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<p>In the resulting plot:</p>
+<ul>
+<li>the horizontal axis identifies one sample</li>
+<li>the vertical axis identifies the other sample</li>
+<li>the fill colour represents the distance between them</li>
+<li>each tile represents one pair of samples</li>
+</ul>
+<p>The samples are displayed in their current data orde and they have not been automatically clustered. The heatmap displays the pairwise distances, but the arrangement of rows and columns should not itself be interpreted as the result of a clustering analysis.</p>
+<p>The default colours and spacing can make the pattern difficult to see. We can add a <code>scale_fill_viridis_c()</code> layer to change the colour scale and a <code>coord_equal()</code> layer to make the tiles square:</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb34"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a>distance_plot <span class="ot">&lt;-</span> distance_plot <span class="sc">+</span></span>
+<span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_viridis_c</span>() <span class="sc">+</span></span>
+<span id="cb34-3"><a href="#cb34-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">coord_equal</span>()</span>
+<span id="cb34-4"><a href="#cb34-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb34-5"><a href="#cb34-5" aria-hidden="true" tabindex="-1"></a>distance_plot</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="chapter08_restructured_files/figure-html/unnamed-chunk-17-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>The <a href="https://cran.r-project.org/web/packages/viridis/vignettes/intro-to-viridis.html">viridis colour palettes</a> are designed to remain readable for people with common forms of colour vision deficiency.</p>
+<p>In this colour scale:</p>
+<ul>
+<li><strong>dark purple</strong> represents the smallest distances and therefore the most similar expression profiles</li>
+<li><strong>green</strong> represents intermediate distances</li>
+<li><strong>yellow</strong> represents the largest distances and therefore the least similar expression profiles.</li>
+</ul>
+<div class="callout callout-style-default callout-tip callout-titled" title="Try it yourself: Interpret the heatmap">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Try it yourself: Interpret the heatmap
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Examine the heatmap and discuss these questions with a partner before revealing the suggested answers:</p>
+<ol type="1">
+<li>Why are the tiles along the diagonal dark purple?</li>
+<li>Do the HAT samples appear to have similar expression profiles to one another?</li>
+<li>Do the SERO TL+ samples form an equally consistent group?</li>
+<li>How do the distances between HAT and SERO TL+ samples compare with the distances among the HAT samples?</li>
+<li>Does the heatmap support the overall pattern seen in the PCA?</li>
+<li>What can the heatmap not tell us about the cause of the pattern?</li>
+</ol>
+<p>Complete the interpretation below (you could add it as a comment in your script to remind yourself):</p>
+<p><code># The distance heatmap shows that __________. This supports the PCA because __________. However, __________.</code></p>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Suggested answers">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-14-contents" aria-controls="callout-14" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Suggested answers
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-14" class="callout-14-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<ol type="1">
+<li><p>The diagonal compares each sample with itself. A sample has a distance of zero from itself, so these tiles have the darkest colour.</p></li>
+<li><p>The HAT samples form a relatively consistent block of smaller distances. This suggests that the HAT samples have broadly similar expression profiles across the genes used in the calculation.</p></li>
+<li><p>The distances among the SERO TL+ samples are more variable. Some sample pairs have relatively similar profiles, while others have larger distances. The SERO TL+ samples therefore appear more heterogeneous than the HAT samples.</p></li>
+<li><p>Distances between HAT and SERO TL+ samples are generally larger than distances among the HAT samples. This is visible from the lighter colours in comparisons between the groups.</p></li>
+<li><p>Yes. The PCA showed a distinction between the HAT and SERO TL+ samples. The distance heatmap supports this by showing relatively small distances among HAT samples and generally larger distances between the two groups.</p></li>
+<li><p>The heatmap cannot tell us what caused the pattern. Biological variation, differences in cell composition, clinical characteristics or technical variation could all contribute. These possibilities would need to be investigated using the sample metadata and quality-control information.</p></li>
+</ol>
+<p>A possible interpretation is:</p>
+<p><code># The distance heatmap shows that the HAT samples have relatively similar expression profiles, while the SERO TL+ samples are more varied. This supports the PCA because both plots show a distinction between the HAT and SERO TL+ expression profiles. However, the heatmap does not explain the greater variation among the SERO TL+ samples.</code></p>
+</div>
+</div>
+</div>
+</section>
+<section id="save-the-sample-distance-heatmap" class="level2" data-number="8.11">
+<h2 data-number="8.11" class="anchored" data-anchor-id="save-the-sample-distance-heatmap"><span class="header-section-number">8.11</span> Save the sample-distance heatmap</h2>
+<p>The heatmap is stored in the <code>distance_plot</code> object. Use <code>ggsave()</code> to save it as <code>sample_distance_heatmap.png</code> in the <code>figures</code> directory.</p>
+<div class="callout callout-style-default callout-tip callout-titled" title="Suggested answer">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-15-contents" aria-controls="callout-15" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Suggested answer
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-15" class="callout-15-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb35"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggsave</span>(</span>
+<span id="cb35-2"><a href="#cb35-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">filename =</span> <span class="st">"figures/sample_distance_heatmap.png"</span>,</span>
+<span id="cb35-3"><a href="#cb35-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">plot =</span> distance_plot</span>
+<span id="cb35-4"><a href="#cb35-4" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Saving 7 x 5 in image</code></pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section id="integrate-the-evidence" class="level2" data-number="8.12">
+<h2 data-number="8.12" class="anchored" data-anchor-id="integrate-the-evidence"><span class="header-section-number">8.12</span> Integrate the evidence</h2>
+<p>We have examined the HAT and SERO TL+ comparison at two levels:</p>
+<ol type="1">
+<li>DESeq2, the MA plot and the volcano plot described differences in individual genes.</li>
+<li>The PCA and sample-distance heatmap described broader patterns across the samples.</li>
+</ol>
+<p>We will now combine this evidence into one biological interpretation.</p>
+<div class="callout callout-style-default callout-important callout-titled" title="Try it yourself: Summarise the data">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Important</span>Try it yourself: Summarise the data
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Use the gene-level figures from <a href="./chapter07_restructured.html">Chapter 7</a> and the sample-level figures created in this chapter to answer the following questions.</p>
+<section id="describe-the-sample-level-pattern" class="level3" data-number="8.12.1">
+<h3 data-number="8.12.1" class="anchored" data-anchor-id="describe-the-sample-level-pattern"><span class="header-section-number">8.12.1</span> Describe the sample-level pattern</h3>
+<ol type="1">
+<li>How are the HAT and SERO TL+ samples positioned along PC1?</li>
+<li>Which group has the more consistent overall expression profiles?</li>
+<li>What evidence shows that the SERO TL+ samples are more heterogeneous?</li>
+</ol>
+</section>
+<section id="connect-the-sample-level-and-gene-level-evidence" class="level3" data-number="8.12.2">
+<h3 data-number="8.12.2" class="anchored" data-anchor-id="connect-the-sample-level-and-gene-level-evidence"><span class="header-section-number">8.12.2</span> Connect the sample-level and gene-level evidence</h3>
+<ol start="4" type="1">
+<li>How is the separation in the PCA consistent with the differential-expression results from <a href="./chapter07_restructured.html">Chapter 7</a>?</li>
+<li>What additional information does the distance heatmap provide that is not as clear in the PCA?</li>
+</ol>
+</section>
+<section id="evaluate-the-biological-interpretation" class="level3" data-number="8.12.3">
+<h3 data-number="8.12.3" class="anchored" data-anchor-id="evaluate-the-biological-interpretation"><span class="header-section-number">8.12.3</span> Evaluate the biological interpretation</h3>
+<ol start="6" type="1">
+<li>Could the greater variation among SERO TL+ samples be related to variation in their infection or clinical phenotype?</li>
+<li>What other biological or technical factors could produce this pattern?</li>
+<li>What additional data or analysis would help distinguish among these explanations?</li>
+</ol>
+<p>Complete the interpretation below (you could add it as a comment in your script to remind yourself):</p>
+<p><code># The PCA and distance heatmap show that __________. This is consistent with the gene-level results because __________. The greater variation among the SERO TL+ samples could reflect __________. However, __________ would need to be examined before drawing a causal conclusion.</code></p>
+</section>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Suggested answers">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-17-contents" aria-controls="callout-17" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Suggested answers
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-17" class="callout-17-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<ol type="1">
+<li><p>The HAT and SERO TL+ samples are completely separated along PC1 in the displayed PCA. All HAT samples have negative PC1 values, while all SERO TL+ samples have positive PC1 values.</p></li>
+<li><p>The HAT samples have the more consistent overall expression profiles. The HAT samples generally have smaller distances from one another in the sample-distance heatmap.</p></li>
+<li><p>The SERO TL+ samples are spread across PC1 and PC2 in the PCA and have more variable pairwise distances in the heatmap. Some SERO TL+ sample pairs have relatively similar profiles, while other pairs have larger distances.</p></li>
+<li><p><a href="./chapter07_restructured.html">Chapter 7</a> identified differences in the expression of many individual genes between HAT and SERO TL+. The separation in the PCA shows that these gene-level differences are accompanied by a broader difference in the overall expression profiles of the samples.</p></li>
+<li><p>The PCA provides a compressed two-dimensional summary of the major expression patterns. The distance heatmap shows every pairwise sample comparison. It therefore makes the relatively consistent HAT group and the greater heterogeneity among SERO TL+ samples easier to see.</p></li>
+<li><p>Possibly. SERO TL+ individuals may have less uniform infection or clinical characteristics than individuals with symptomatic HAT. Variation in immune response, infection stage, parasite exposure or progression towards disease could contribute to their different expression profiles. These explanations are hypotheses and are not demonstrated by the plots.</p></li>
+<li><p>Other explanations include differences in blood-cell composition, age, sex, sample collection, RNA quality, sequencing depth, processing batch or other participant characteristics.</p></li>
+<li><p>Useful follow-up information could include clinical measurements, symptom severity, parasitological evidence, immune-cell counts, demographic metadata and technical quality-control variables. The expression patterns could then be tested for associations with these variables. Cell-type-specific or single-cell measurements could help distinguish changes within cells from differences in cell composition.</p></li>
+</ol>
+<p>A possible interpretation is:</p>
+<p><code># The PCA and distance heatmap show that HAT and SERO TL+ samples have distinct overall expression profiles, with the HAT samples forming a relatively consistent group and the SERO TL+ samples showing greater variation. This is consistent with the gene-level results because the previous chapter identified many genes whose expression differed between the two status groups. The greater variation among the SERO TL+ samples could reflect variation in infection, immune response or clinical phenotype. However, clinical metadata, cell composition and possible technical variables would need to be examined before drawing a causal conclusion.</code></p>
+</div>
+</div>
+</div>
+<div class="callout callout-style-default callout-warning callout-titled" title="What if the sample pattern looks unexpected?">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>What if the sample pattern looks unexpected?
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The PCA and the sample-distance heatmap do not need to show perfect separation between HAT and SERO TL+. Samples from the same biological group will not have identical expression profiles and genuine biological variation may exist within each group.</p>
+<p>However, some patterns should prompt further investigation:</p>
+<ul>
+<li><strong>One or a small number of samples are far from all the others in the PCA:</strong> the samples may be biologically unusual, affected by a technical problem or incorrectly labelled.</li>
+<li><strong>One sample or a small number of samples have large distances from every other sample in the heatmap:</strong> this supports the possibility that these samples are unusual across their overall expression profile.</li>
+<li><strong>Samples form subgroups that are not explained by status:</strong> another variable, such as batch, sampling location, clinical characteristics or cell composition may be associated with the expression pattern.</li>
+<li><strong>Samples separate by a technical variable rather than status:</strong> the apparent pattern may be influenced by how or when the samples were processed.</li>
+<li><strong>The status groups overlap extensively:</strong> status may not be the main source of variation, or the biological difference may affect only a subset of genes rather than the overall expression profile.</li>
+<li><strong>PCA and the heatmap appear to disagree:</strong> inspect which principal components are displayed, how much variation they explain and whether a small number of samples are influencing the pattern.</li>
+</ul>
+<p>An unusual sample should not be removed simply because it looks different. First check the sample metadata, quality-control results, count distributions and experimental records. A sample should only be excluded when there is a clear and documented biological or technical reason.</p>
+<p>These plots can show that a pattern requires investigation, but they cannot determine its cause by themselves.</p>
+</div>
+</div>
+</section>
+<section id="summary" class="level2" data-number="8.13">
+<h2 data-number="8.13" class="anchored" data-anchor-id="summary"><span class="header-section-number">8.13</span> Summary</h2>
+<p>In this chapter, you:</p>
+<ul>
+<li>moved from gene-level results to sample-level exploration</li>
+<li>used VST values to compare expression profiles among samples</li>
+<li>selected and verified the HAT and SERO TL+ samples</li>
+<li>created and interpreted a PCA plot</li>
+<li>calculated and visualised pairwise sample distances</li>
+<li>compared the complementary evidence from the PCA and distance heatmap</li>
+<li>integrated gene-level and sample-level evidence without making a causal claim</li>
+</ul>
+<p>The next chapter will focus on how visualisations are constructed and customised. The plotting code in this session was intentionally simple so that the analytical and biological reasoning remained the main focus.</p>
+</section>
+<section id="optional-extra-activities" class="level2" data-number="8.14">
+<h2 data-number="8.14" class="anchored" data-anchor-id="optional-extra-activities"><span class="header-section-number">8.14</span> Optional extra activities</h2>
+<p>You have now completed the required activities for this chapter. The remaining activities provide <strong>optional but valuable</strong> opportunities for further practice.</p>
+<div class="callout callout-style-default callout-tip callout-titled" title="Optional Activity 1: Challenge an overclaim">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Optional Activity 1: Challenge an overclaim
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>A researcher writes the following using the same results that you have produced so far:</p>
+<p>“The HAT and SERO TL+ samples separate in the PCA, so HAT causes the observed gene-expression pattern.”</p>
+<p>What is wrong with this conclusion and what can the PCA actually show us?</p>
+<p>Use evidence from the following analyses to rewrite the statement:</p>
+<ul>
+<li>the MA plot</li>
+<li>the volcano plot</li>
+<li>the annotated differential-expression results</li>
+<li>the PCA</li>
+<li>the sample-distance heatmap</li>
+</ul>
+<p>Your revised interpretation should:</p>
+<ol type="1">
+<li>describe the main gene-level pattern</li>
+<li>describe the sample-level pattern shown by both the PCA and sample-distance heatmap</li>
+<li>acknowledge variation within the HAT and SERO TL+ groups</li>
+<li>propose one possible biological explanation</li>
+<li>give at least one alternative biological or technical explanation</li>
+<li>explain why the current analysis cannot establish causation</li>
+<li>propose a follow-up analysis or measurement that could help distinguish between the explanations</li>
+</ol>
+<p>Aim to write one short scientific paragraph rather than answering each point separately.</p>
+<p>Before writing, consider the difference between:</p>
+<ul>
+<li><strong>observation:</strong> something shown directly by the analysis</li>
+<li><strong>interpretation:</strong> a possible explanation for the observation</li>
+<li><strong>conclusion:</strong> a claim that is justified by the available evidence</li>
+</ul>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Possible solution">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-20-contents" aria-controls="callout-20" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Possible solution
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-20" class="callout-20-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<p>The study compares existing groups rather than experimentally assigning sample status. Separation in a PCA shows that an expression pattern is associated with the groups, but PCA does not determine the cause of that pattern.</p>
+<p>In addition, PC1 and PC2 display only part of the total variation in the data. The PCA should therefore be considered alongside the sample-distance heatmap, metadata, quality-control information and statistical model.</p>
+<p>Taken together, the statement is far too strong and over-interprets the data. There is no single correct answer but a balanced interpretation should combine the evidence without claiming that sample status caused the observed differences. It is fine to conclude that the results support an association while more evidence is needed to determine its cause.</p>
+<p><strong>Observations supported directly by the analyses</strong></p>
+<ul>
+<li>The MA plot shows estimated fold changes across gene abundance.</li>
+<li>The volcano plot shows genes with different combinations of effect size and statistical evidence.</li>
+<li>The annotated results identify some of the genes contributing to the pattern.</li>
+<li>The PCA shows a broad distinction between the groups, particularly along PC1.</li>
+<li>The heatmap shows that many HAT samples have relatively similar expression profiles and that distances between groups are generally larger.</li>
+<li>Neither group is completely uniform, and the SERO TL+ samples show noticeable within-group variation.</li>
+</ul>
+<p><strong>Possible interpretations</strong></p>
+<p>The pattern could reflect:</p>
+<ul>
+<li>biological differences associated with symptomatic and asymptomatic infection</li>
+<li>differences in immune activity</li>
+<li>differences in the proportions of blood-cell types</li>
+<li>variation in infection history or other clinical characteristics</li>
+<li>batch, sample handling or another technical variable</li>
+</ul>
+<p>These are hypotheses suggested by the pattern. The plots do not distinguish between them.</p>
+<p><strong>Suitable follow-up investigations</strong></p>
+<ul>
+<li>colouring or shaping the PCA points by potential explanatory metadata</li>
+<li>checking whether sample processing or batch aligns with the PCA or heatmap structure</li>
+<li>adding relevant variables to the DESeq2 model</li>
+<li>examining blood-cell counts or estimated cell composition</li>
+<li>investigating whether related annotated genes participate in shared biological processes</li>
+<li>testing whether the pattern is reproduced in an independent dataset</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Optional Activity 2: Investigate sensitivity to the number of genes">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Optional Activity 2: Investigate sensitivity to the number of genes
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>In the main workflow, the PCA was calculated using the 500 genes with the greatest variation across the samples. This helps the PCA focus on genes that contribute most strongly to differences among samples.</p>
+<p>However, selecting 500 genes is an analytical choice rather than a universal rule, although it is the default threshold that DESeq2 uses. In this activity, you will investigate whether the main sample pattern is sensitive to the number of variable genes included in the PCA.</p>
+<p>This is a <em>controlled sensitivity analysis</em>. The aim is to determine whether the broad interpretation is stable, not a fishing exercise to select whichever number of genes produces the strongest separation.</p>
+<p>Modify the PCA code to examine the PCA using:</p>
+<ul>
+<li>the 100 most variable genes</li>
+<li>the 1,000 most variable genes</li>
+</ul>
+<p>Keep everything else unchanged so that the number of genes is the only difference between the analyses.</p>
+<p>For each analysis, your code should:</p>
+<ul>
+<li>call <code>plotPCA()</code> using the required <code>ntop</code> value</li>
+<li>retain the same transformed object and grouping variable</li>
+<li>create and display the PCA plot</li>
+<li>record the percentage of variation represented by PC1 and PC2</li>
+</ul>
+<p>Compare the PCA plots produced using 100, 500 and 1,000 genes.</p>
+<ol type="1">
+<li>Does the broad separation between HAT and SERO TL+ remain visible?</li>
+<li>Do the same samples remain close together?</li>
+<li>Does any sample move noticeably relative to the others?</li>
+<li>Does the apparent variation within either status group change?</li>
+<li>How does the percentage of variation explained by PC1 and PC2 change?</li>
+<li>Which features are stable across all three analyses?</li>
+<li>Which features appear sensitive to the number of genes selected?</li>
+<li>Does one analysis lead to a substantially different biological interpretation?</li>
+<li>Why would it be inappropriate to report only the plot showing the strongest separation?</li>
+<li>Why should the 500-gene version remain the main reported analysis unless a different choice was specified in advance?</li>
+</ol>
+<p>Summarise your findings by filling in the following:</p>
+<pre class="text"><code>The broad PCA pattern was __________ across the three analyses.
+
+The main stable features were __________.
+
+The features most affected by the number of genes were __________.
+
+This suggests that our interpretation is __________ to the number of
+variable genes included.</code></pre>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Possible guided solution">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-22-contents" aria-controls="callout-22" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Possible guided solution
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-22" class="callout-22-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<p>The broad PCA pattern is similar when the analysis is repeated using 100, 500 and 1000 variable genes.</p>
+<p>In all three plots:</p>
+<ul>
+<li>the HAT and SERO TL+ samples are separated mainly along PC1</li>
+<li>most HAT samples have negative PC1 coordinates</li>
+<li>most SERO TL+ samples have positive PC1 coordinates</li>
+<li>there is noticeable variation within both groups</li>
+<li>some samples are separated from other members of the same status group along PC2</li>
+</ul>
+<p>This suggests that the main distinction between the HAT and SERO TL+ samples is reasonably robust to the number of variable genes included. The separation is therefore unlikely to depend entirely on the exact choice of 500 genes.</p>
+<p>However, the plots are not identical. The positions of individual samples, the spread within each group and the relative importance of PC1 and PC2 can change when different genes are included. This is expected because each PCA is calculated from a different expression matrix. The analysis using 100 genes is based on a relatively small set of the most variable genes. It may therefore be influenced strongly by a few genes with particularly large variation. The analysis using 1,000 genes includes more of the expression data but some of the additional genes may contribute relatively little to the main sample differences.</p>
+<p>This suggests that sample status is associated with a major source of expression variation in these data but they do not demonstrate that status causes the separation. Other biological or technical variables associated with status could also contribute to the pattern.</p>
+<p>The 500-gene PCA should remain the main reported analysis because it was the choice made in the original workflow. The 100- and 1,000-gene analyses provide evidence that the broad interpretation is not highly sensitive to this choice. It would not be appropriate to select one of the alternative plots simply because it appears to show the strongest separation.</p>
+<p>Example code:</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb38"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a><span class="co">#build and plot the top 100 gene pca</span></span>
+<span id="cb38-2"><a href="#cb38-2" aria-hidden="true" tabindex="-1"></a>pca_data_100 <span class="ot">&lt;-</span> <span class="fu">plotPCA</span>(</span>
+<span id="cb38-3"><a href="#cb38-3" aria-hidden="true" tabindex="-1"></a>  selected_vsd,</span>
+<span id="cb38-4"><a href="#cb38-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">intgroup =</span> <span class="st">"status"</span>,</span>
+<span id="cb38-5"><a href="#cb38-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">ntop =</span> <span class="dv">100</span>,</span>
+<span id="cb38-6"><a href="#cb38-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">returnData =</span> <span class="cn">TRUE</span></span>
+<span id="cb38-7"><a href="#cb38-7" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>using ntop=100 top features by variance</code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb40"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a>pca_plot_100 <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(</span>
+<span id="cb40-2"><a href="#cb40-2" aria-hidden="true" tabindex="-1"></a>  pca_data_100,</span>
+<span id="cb40-3"><a href="#cb40-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">aes</span>(</span>
+<span id="cb40-4"><a href="#cb40-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> PC1,</span>
+<span id="cb40-5"><a href="#cb40-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> PC2,</span>
+<span id="cb40-6"><a href="#cb40-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">colour =</span> group</span>
+<span id="cb40-7"><a href="#cb40-7" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb40-8"><a href="#cb40-8" aria-hidden="true" tabindex="-1"></a>) <span class="sc">+</span></span>
+<span id="cb40-9"><a href="#cb40-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>()</span>
+<span id="cb40-10"><a href="#cb40-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb40-11"><a href="#cb40-11" aria-hidden="true" tabindex="-1"></a><span class="co">#build and plot the top 1000 gene pca</span></span>
+<span id="cb40-12"><a href="#cb40-12" aria-hidden="true" tabindex="-1"></a>pca_data_1000 <span class="ot">&lt;-</span> <span class="fu">plotPCA</span>(</span>
+<span id="cb40-13"><a href="#cb40-13" aria-hidden="true" tabindex="-1"></a>  selected_vsd,</span>
+<span id="cb40-14"><a href="#cb40-14" aria-hidden="true" tabindex="-1"></a>  <span class="at">intgroup =</span> <span class="st">"status"</span>,</span>
+<span id="cb40-15"><a href="#cb40-15" aria-hidden="true" tabindex="-1"></a>  <span class="at">ntop =</span> <span class="dv">1000</span>,</span>
+<span id="cb40-16"><a href="#cb40-16" aria-hidden="true" tabindex="-1"></a>  <span class="at">returnData =</span> <span class="cn">TRUE</span></span>
+<span id="cb40-17"><a href="#cb40-17" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>using ntop=1000 top features by variance</code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb42"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a>pca_plot_1000 <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(</span>
+<span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a>  pca_data_1000,</span>
+<span id="cb42-3"><a href="#cb42-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">aes</span>(</span>
+<span id="cb42-4"><a href="#cb42-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> PC1,</span>
+<span id="cb42-5"><a href="#cb42-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> PC2,</span>
+<span id="cb42-6"><a href="#cb42-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">colour =</span> group</span>
+<span id="cb42-7"><a href="#cb42-7" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb42-8"><a href="#cb42-8" aria-hidden="true" tabindex="-1"></a>) <span class="sc">+</span></span>
+<span id="cb42-9"><a href="#cb42-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>()</span>
+<span id="cb42-10"><a href="#cb42-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-11"><a href="#cb42-11" aria-hidden="true" tabindex="-1"></a>pca_plot_100</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="chapter08_restructured_files/figure-html/unnamed-chunk-19-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb43"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb43-1"><a href="#cb43-1" aria-hidden="true" tabindex="-1"></a>pca_plot_1000</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="chapter08_restructured_files/figure-html/unnamed-chunk-19-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb44"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a><span class="co">#original 500 plot</span></span>
+<span id="cb44-2"><a href="#cb44-2" aria-hidden="true" tabindex="-1"></a>pca_plot</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="chapter08_restructured_files/figure-html/unnamed-chunk-19-3.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<script>
+  tippy('[data-tippy-content]');
+</script>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    // Ensure there is a toggle, if there isn't float one in the top right
+    if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+      const a = window.document.createElement('a');
+      a.classList.add('top-right');
+      a.classList.add('quarto-color-scheme-toggle');
+      a.href = "";
+      a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+      const i = window.document.createElement("i");
+      i.classList.add('bi');
+      a.appendChild(i);
+      window.document.body.appendChild(a);
+    }
+    setColorSchemeToggle(hasAlternateSentinel())
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+<nav class="page-navigation">
+  <div class="nav-page nav-page-previous">
+      <a href="./chapter07_restructured.html" class="pagination-link" aria-label="Exploring and Annotating Gene-Level Results">
+        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text"><span class="chapter-number">7</span>&nbsp; <span class="chapter-title">Exploring and Annotating Gene-Level Results</span></span>
+      </a>          
+  </div>
+  <div class="nav-page nav-page-next">
+      <a href="./chapter09.html" class="pagination-link" aria-label="Customising Data Visualisations">
+        <span class="nav-page-text"><span class="chapter-number">9</span>&nbsp; <span class="chapter-title">Customising Data Visualisations</span></span> <i class="bi bi-arrow-right-short"></i>
+      </a>
+  </div>
+</nav>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

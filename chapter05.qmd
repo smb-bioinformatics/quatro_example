@@ -1,0 +1,1165 @@
+<style>
+  .tooltip-text {
+    text-decoration: underline dotted #4a5568 2px; /* Dotted line under the word */
+    text-underline-offset: 3px;                     /* Gives space between text and line */
+    cursor: help;                                  /* Changes mouse pointer to a '?' cursor */
+    background-color: #f7fafc;                     /* Optional subtle background highlight */
+    padding: 0 2px;
+    border-radius: 2px;
+  }
+  
+  .tooltip-text:hover {
+    background-color: #e2e8f0;                     /* Highlight on mouseover */
+  }
+</style>
+<link rel="stylesheet" href="https://unpkg.com/tippy.js@6/themes/light.css" />
+
+# Differential Expression
+
+## What you'll learn
+
+In [Chapter 4](chapter04.qmd), you examined the distribution of gene counts within each sample. You created a log2(count + 1) transformed copy of the count matrix, reshaped it for plotting and compared the samples using boxplots. By combining this plot with the quality-control summaries from [Chapter 3](chapter03.qmd), you found no clear reason to exclude any samples *at this stage*. In this tutorial, we'll ask whether gene expression differs between patients with symptomatic HAT and people classified as SERO TL+ (sometimes described as having latent infections). Remember, both groups are infected with trypanosome parasites but SERO TL+ individuals do not show an overt phenotype. In this tutorial, you'll prepare the counts and sample information for `DESeq2`, construct and inspect a `DESeqDataSet`, filter out low-count genes, fit a statistical model using the negative binomial distribution and extract your first differential expression contrast.
+
+Before writing any code, it's important to consider the biology. Discuss the following questions with a partner before revealing the solution:
+
+1. What is the response being measured?
+2. What is the explanatory variable?
+3. What are the biological replicates?
+4. What comparison will HAT versus SERO TL+ make?
+5. What could this observational comparison show and what can it not establish?
+
+::: {.callout-tip collapse="true" title="Solution"}
+
+1. The response is the number of RNA-seq reads assigned to each gene in each sample. These *gene counts* provide a measure of gene expression.
+
+2. The explanatory variable is `status`, which places each biological sample into a group (hat, sero or ctrl).
+
+3. The biological replicates are the independently collected samples from different people within each group. Genes and sequencing reads are measurements taken from these samples, not additional biological replicates.
+
+4. It will compare gene expression in samples from the HAT group with gene expression in samples from the SERO TL+ group. For this comparison, a positive log2 fold change indicates higher estimated expression in HAT, while a negative log2 fold change indicates higher estimated expression in SERO.
+
+5. The analysis can identify genes whose expression is **associated with** HAT or SERO status in these samples. It cannot establish that status directly **caused** the differences in gene expression. Other biological or technical differences between the groups could also contribute to the observed pattern.
+
+:::
+
+::: {.callout-note}
+## Learning outcomes
+By the end of this chapter you should be able to:
+
+- verify that a count matrix and sample metadata are aligned
+- represent an experimental group as a <span class="tooltip-text" data-tippy-content="A factor is how R stores a variable made up of a fixed set of categories, such as biological groups. Unlike ordinary text, a factor tells R which categories exist so they can be used correctly in summaries, plots and statistical models.">factor</span> and inspect its levels
+- explain the roles of `countData`, `colData` and `design`
+- construct and inspect a `DESeqDataSet`
+- filter genes using a logical condition and verify the result
+- fit a `DESeq2` model and extract a specified contrast
+- interpret the main columns in a `DESeq`2 result
+- save an unannotated result table that uses Ensembl gene identifiers
+
+**ISCB alignment:** C3, D3, F3 and H3, at application level.
+:::
+
+::: {.callout-tip title="Recap: code so far" collapse="true"}
+```{r}
+count_data <- as.matrix(read.csv(
+  "m_sample_counts.csv", header = TRUE, row.names = 1, check.names = FALSE
+))
+sample_info <- read.csv(
+  "m_sample_info.csv", header = TRUE, row.names = 1, check.names = FALSE
+)
+```
+:::
+
+For this session we will be using the DESeq2 R package so we need to load it using the library() function. You can add this to the top of your script with the other package imports, or place it before the next code block.
+
+```{r}
+#| message: false
+#| warning: false
+library(DESeq2)
+```
+
+## Representing the biological groups as a factor
+
+In the HAT data set, the **status** column contains the category labels `ctrl`, `sero` and `hat`. R can store these labels as ordinary text, but the statistical model needs to recognise that they represent distinct biological groups. We therefore have to convert status into a factor.
+
+A factor is how R stores a variable made up of a fixed set of categories, such as biological groups. Unlike ordinary text, a factor tells R which categories exist so they can be used correctly in summaries, plots and statistical models. 
+
+```{r}
+sample_info$status <- factor(
+  sample_info$status
+)
+
+levels(
+  sample_info$status
+)
+```
+
+::: {.callout-note title="Factor level order"}
+The order of <span class="tooltip-text" data-tippy-content="A factor is how R stores a variable made up of a fixed set of categories, such as biological groups. Unlike ordinary text, a factor tells R which categories exist so they can be used correctly in summaries, plots and statistical models.">factor</span> levels can affect how model coefficients are labelled. In this chapter, the direction of the biological comparison will be specified explicitly using a **contrast**, so we do not need to change the reference level to get the comparison we want.
+:::
+
+## Checking biological replication
+
+Before constructing the model, we should understand how many biological samples are available for each status. The number of samples matters because DESeq2 uses the differences among samples within the same group to estimate biological variability.
+
+Here, each column in the count matrix represents one biological sample. The genes and sequencing reads are measurements taken from those samples. They are not additional biological replicates.
+
+As before, we can use the `table()` function to summarise the status column in `sample_info` to show the number of samples in each group.
+
+```r
+table(sample_info$status)
+```
+
+::: {.callout-tip title="Try it yourself: Interpret group replication"}
+
+1. How many biological samples are in each group?
+2. Are the groups balanced?
+3. What is the replicate in this experiment: each gene, each read, or each person/sample?
+4. Why do 30,000 genes not compensate for having relatively few samples?
+5. Which group has the least information for estimating within-group variability?
+
+:::
+
+::: {.callout-tip collapse="true" title="Suggested answers"}
+
+1. There are **6 CTRL samples, 9 HAT samples and 6 SERO TL+ samples**.
+
+2. The groups are **not completely balanced**, because they do not all contain the same number of samples. HAT has three more samples than either CTRL or SERO TL+. This difference does not prevent DESeq2 from performing the analysis.
+
+3. The biological replicates are the **independently collected people or samples** within each group. Each column of the count matrix represents one biological replicate. Genes and sequencing reads are measurements taken from those samples, not additional biological replicates.
+
+4. The approximately 30,000 genes are measured repeatedly in the same set of biological samples. They provide information about many different genes, but they do not provide 30,000 independent observations of the difference between HAT and SERO TL+. Additional biological samples would provide more information about how much expression varies among people within each group.
+
+5. CTRL and SERO TL+ have the fewest biological samples, with six each. For our planned **HAT-versus-SERO TL+ comparison**, SERO TL+ therefore provides less information about within-group variability than HAT. This may make estimates involving SERO TL+ less precise than they would be if more SERO TL+ samples were available.
+
+:::
+
+## Constructing the `DESeqDataSet`
+
+DESeq2 stores the information needed for differential expression analysis in an object called a `DESeqDataSet`. Keeping the information together helps ensure that the counts for each sample remain connected to the correct sample information and experimental design.
+
+A `DESeqDataSet` contains three connected components:
+
+```text
+countData = the RNA-seq counts as a matrix (genes in rows and samples in columns)
+
+colData   = information describing the samples (samples in rows and variables in columns)
+
+design    = the sample variable or variables included in the model
+```
+::: {.callout-note title="The design formula"}
+
+The **design formula** tells DESeq2 which sample variable should be included when explaining systematic differences in the counts.
+
+For this analysis, the design formula is:
+
+```r
+~ status
+```
+
+The tilde (`~`) introduces a model formula. Here, `~ status` tells `DESeq2` that the model should include differences associated with the levels of `status`.
+
+This design includes all three status groups. It does not yet specify which two groups we want to compare. We will request the HAT-versus-SERO TL+ comparison later using `results()`.
+
+:::
+
+### Complete the function call
+
+We can construct the `DESeqDataSet` object we need using the `DESeqDataSetFromMatrix()` helper function from `DESeq2`. 
+
+::: {.callout-tip title="Try it yourself: Complete the code"}
+
+How would you use each of the following options once to fill in the blanks and complete the statement to build a `DESeqDataSet` with our HAT data set:
+
+```text
+count_data    sample_info    status
+```
+
+```r
+dds <- DESeqDataSetFromMatrix(
+  countData = __________,
+  colData = __________,
+  design = ~ __________
+)
+```
+
+Think about the type of information expected by each argument:
+
+- Which object contains the RNA-seq counts?
+- Which object describes the biological samples?
+- Which variable identifies the biological groups?
+
+:::
+
+::: {.callout-tip collapse="true" title="Solution"}
+
+```{r}
+dds <- DESeqDataSetFromMatrix(
+  countData = count_data,
+  colData = sample_info,
+  design = ~ status
+)
+```
+
+- `countData = count_data` supplies the matrix of gene counts.
+- `colData = sample_info` supplies the information describing each sample.
+- `design = ~ status` tells DESeq2 to include the biological status groups in the model.
+
+:::
+
+::: {.callout-warning title="Make sure to use the original counts"}
+
+DESeq2 uses the original integer counts. The `log2(count + 1)` values created in Chapter 4 were used only for visualisation and must not be supplied to the model.
+
+Notice that we used `countData = count_data` and not `log_count_data`.
+
+:::
+
+Creating a `dds` object organises the counts, sample information and design into one object to make sure it is in a format ready for `DESeq2` to use. It has not yet fitted a statistical model or changed the original count values.
+
+## Check the information stored in `dds`
+
+After constructing the `dds` object, we should check that it contains the correct counts, sample information and design.
+
+`DESeq2` provides **accessor functions** for retrieving these components:
+
+- `counts()` retrieves the count matrix;
+- `colData()` retrieves the sample information;
+- `design()` retrieves the design formula.
+
+We can use these functions to perform three brief checks before continuing.
+
+**Check the count matrix**
+
+The complete count matrix is large, so we will inspect only the first five genes and first four samples:
+
+```{r}
+counts(dds)[1:5, 1:4]
+```
+
+This uses the same `[rows, columns]` indexing that you used with matrices in [Chapter 2](chapter02.qmd).
+
+::: {.callout-tip title="Try it yourself: Check the stored counts"}
+
+How could you check whether these values are identical to the corresponding values in the original `count_data` matrix?
+
+:::
+
+::: {.callout-tip collapse="true" title="Solution"}
+
+```{r}
+identical(
+  counts(dds)[1:5, 1:4],
+  count_data[1:5, 1:4]
+)
+```
+
+:::
+
+**Check the sample information**
+
+The `colData()` function retrieves the sample information stored in `dds`. `DESeq2` stores this information in a specialised table that we can convert to a familiar data frame:
+
+```{r}
+dds_sample_info <- as.data.frame(colData(dds))
+
+head(dds_sample_info)
+```
+
+::: {.callout-tip title="Try it yourself: Check the stored sample information"}
+
+Compare `dds_sample_info` with the original `sample_info` object.
+
+1. Do the sample names appear in the same order?
+2. Does each sample have the same `status` in both objects?
+3. Why would a difference in sample order be a serious problem?
+
+:::
+
+::: {.callout-tip collapse="true" title="Solution"}
+
+1. We can compare the row names of the two objects directly:
+
+```{r}
+identical(
+  rownames(dds_sample_info),
+  rownames(sample_info)
+)
+```
+
+   This should return `TRUE`, confirming that the sample names appear in the same order.
+
+2. We can compare the `status` values directly:
+
+```{r}
+identical(
+  as.character(dds_sample_info$status),
+  as.character(sample_info$status)
+)
+```
+
+This should return `TRUE`, confirming that each sample has the same `status` in both objects.
+
+3. The columns of the count matrix and the rows of the sample information must describe the same samples in the same order. If their order differed, a sample's counts could be associated with information from the wrong person. `DESeq2` could then compare incorrectly labelled biological groups.
+
+:::
+
+
+**Check the model design**
+
+Finally, use `design()` to retrieve the model formula stored in `dds`:
+
+```{r}
+design(dds)
+```
+
+This confirms that `status` is the sample variable included in the model. It does not yet specify the HAT-versus-SERO TL+ comparison. We will define that comparison when we retrieve the model results.
+
+These checks confirm that `dds` contains the expected count matrix, correctly aligned sample information and intended model design. We can now prepare the object for model fitting by removing genes with very little count information.
+
+## Apply a simple low-count filter
+
+We will now be performing an additional **optional** step to speed up analysis. Genes with very low counts (e.g. less than 10) across all samples contain little information for comparing groups and keeping these genes can make the analysis slower, particularly on personal laptops. Before fitting the model, we’ll use **filtering** to remove genes with fewer than 10 counts in total across all samples to reduce the size of the data set and speed up the analysis. this is uses operators similar to the method we used to identify zero count genes in same h1.1 in the previous chapter.
+
+::: {.callout-note title="You do not need to memorise this code"}
+For now, focus on what the code does:
+
+1. calculates the total count for each gene in the data set
+2. identifies genes with a total count of at least 10
+3. retains those gene rows.
+
+An optional activity later in this chapter unpacks each operation in more detail.
+:::
+
+```{r}
+# Calculate the total count for each gene across all samples
+gene_total <- rowSums(counts(dds))
+
+# Identify genes with at least 10 counts in total
+keep_gene <- gene_total >= 10
+
+# Retain the selected gene rows and all sample columns
+dds_filtered <- dds[keep_gene, ]
+```
+
+The expression used to filter `dds` follows the familiar indexing pattern:
+
+```text
+object[rows, columns]
+```
+
+In this case:
+
+- `keep_gene` appears before the comma, so it selects **gene rows**;
+- nothing appears after the comma, so **all sample columns** are retained.
+
+::: {.callout-tip title="Check the result"}
+Run:
+
+```{r}
+dim(dds)
+dim(dds_filtered)
+```
+
+Compare the two outputs and answer:
+
+1. Did the number of genes change?
+2. Did the number of samples change?
+3. Why did filtering affect the rows but not the columns?
+
+:::
+
+::: {.callout-tip collapse="true" title="Solution"}
+1. The number of genes decreased because genes with fewer than 10 total counts were removed.
+
+2. The number of samples did not change because the filter was applied to the rows:
+
+3. `keep_gene` appears before the comma, so it selects gene rows. Nothing appears after the comma, so all sample columns are retained.
+
+```r
+dds_filtered <- dds[keep_gene, ]
+```
+
+For this dataset, the dimensions should change from:
+
+```text
+65,217 genes × 21 samples
+```
+
+to:
+
+```text
+30,076 genes × 21 samples
+```
+
+Therefore, the filter removes:
+
+```{r}
+nrow(dds) - nrow(dds_filtered)
+```
+
+This should return `35141`.
+:::
+
+::: {.callout-warning title="What filtering does and does not mean"}
+This is a simple **pre-filter** based only on the total number of counts available for each gene.
+
+- Passing the filter does not mean that a gene is differentially expressed.
+- Passing the filter does not mean that a gene is strongly expressed in every sample.
+- Failing the filter does not mean that a gene has no biological importance.
+- Filtering does not transform or normalise the retained counts.
+- Filtering removes complete gene rows but retains all biological samples.
+
+The threshold of 10 is a simple threshold we are using to speed up analysis rather than a universal rule for every RNA-seq analysis.
+:::
+
+We will use the new `dds_filtered` object when fitting the model in the next section.
+
+## Fitting the DESeq2 model
+
+We have now prepared a `DESeqDataSet` called `dds_filtered` containing:
+
+- the original RNA-seq counts;
+- information describing each sample;
+- the design formula `~ status`;
+- only genes that passed our low-count filter.
+
+The next step is to fit the DESeq2 model:
+
+```{r}
+#| message: false
+
+dds_fitted <- DESeq(
+  dds_filtered
+)
+```
+
+During this step the `DESeq()` function performs the main calculations needed to compare gene expression between the biological groups by fitting the model. Although this requires only one line of R code, several steps take place.
+
+**Adjust for size differences between sequencing libraries**
+
+The total number of reads collected can differ between samples. A sample with a larger sequencing library may therefore have higher counts for many genes, even when there is no biological difference in expression.
+
+DESeq2 estimates a **size factor** for each sample. These size factors allow the model to account for differences in sequencing depth and library composition when comparing samples.
+
+This does not mean that `DESeq2` replaces the original counts with log-transformed values. The model still uses the original integer counts.
+
+**Estimate variability among biological samples**
+
+Counts for the same gene will not be identical in every person, even when the people belong to the same biological group.
+
+DESeq2 estimates the **dispersion** of each gene. Dispersion describes how much the counts for that gene vary among biological samples, beyond the variation expected from counting alone.
+
+This is important because an apparent difference between groups is more convincing when the samples within each group show reasonably consistent patterns.
+
+For example, imagine that two genes have the same estimated difference between HAT and SERO TL+:
+
+- the first gene has similar counts among the people within each group;
+- the second gene has very different counts among people within the same group.
+
+The difference between groups would usually be more convincing for the first gene because there is less variability among its biological replicates.
+
+**Estimate differences associated with status**
+
+Finally, DESeq2 uses the design formula:
+
+```r
+~ status
+```
+
+to fit a separate model for each gene.
+
+The model estimates how the expected count for a gene differs among the levels of `status`, while accounting for library size and variability among biological samples. These estimated group differences are stored as **model coefficients**.
+
+At this stage, the model contains information about all three status groups. We have not yet requested the particular HAT-versus-SERO TL+ comparison. We will do that in the next step using `results()`.
+
+::: {.callout-note title="A simplified overview"}
+
+For each gene, DESeq2 broadly asks:
+
+1. How should differences in sequencing depth between samples be accounted for?
+2. How much do the counts vary among biological samples?
+3. How large is the estimated difference between the biological groups?
+4. Is that difference large relative to its uncertainty?
+
+The final question is assessed using a statistical test. You are not expected to reproduce these calculations yourself.
+
+:::
+
+### What is stored in `dds_fitted`?
+
+We save the result as a new object called `dds_fitted`:
+
+```r
+dds_fitted <- DESeq(dds_filtered)
+```
+
+The new object contains the same filtered counts, sample information and design as `dds_filtered`, together with the information estimated during model fitting, including size factors, dispersions and model coefficients.
+
+We have used a new object name rather than overwriting `dds_filtered`. This allows us to distinguish between:
+
+- `dds`, containing the original genes;
+- `dds_filtered`, containing the genes that passed the filter;
+- `dds_fitted`, containing the filtered data and fitted model.
+
+## Extracting the HAT-versus-SERO contrast
+
+Finally, we will extract our comparison of interest (HAT vs SERO TL+) using a **contrast**. This tells DESeq2 exactly which two groups to compare and in which direction.
+
+```{r}
+res_hat_vs_sero <- results(
+  dds_fitted,
+  contrast = c("status", "hat", "sero"),
+  alpha = 0.05
+)
+```
+
+The three values in `contrast = c("status", "hat", "sero")` specify:
+
+1. the metadata variable being compared (`status`);
+2. the **numerator** group (`hat`);
+3. the **denominator**, or reference, group for this comparison (`sero`).
+
+
+### Interpreting log2 fold change
+
+DESeq2 reports differences between groups as a `log2FoldChange`. This is the estimated fold change expressed on a log2 scale.
+
+Using a log2 scale makes increases and decreases easier to compare (similar to how we transformed the counts to make them easier to compare in the previous tutorial):
+
+- `log2FoldChange = 0` means no estimated difference
+- `log2FoldChange = 1` means approximately 2-fold higher expression
+- `log2FoldChange = 2` means approximately 4-fold higher expression
+- `log2FoldChange = -1` means approximately 2-fold lower expression
+- `log2FoldChange = -2` means approximately 4-fold lower expression
+
+The direction always depends on the order of the comparison. For HAT versus SERO:
+
+- a positive value indicates higher estimated expression in HAT
+- a negative value indicates higher estimated expression in SERO TL+
+
+::: {.callout-tip title="Try it yourself: Practice interpreting log2 fold change"}
+
+For a HAT versus SERO TL+ comparison, what would each result mean?
+
+1. `log2FoldChange = 0`
+2. `log2FoldChange = 1`
+3. `log2FoldChange = -1`
+4. `log2FoldChange = 2`
+
+:::
+
+::: {.callout-tip collapse="true" title="Suggested answers"}
+
+1. `log2FoldChange = 0` means that there is no estimated difference in expression between HAT and SERO.
+2. `log2FoldChange = 1` means that estimated expression is approximately 2-fold higher in HAT than in SERO ($2^1 = 2$-fold).
+3. `log2FoldChange` = -1 means that estimated expression is approximately half as high in HAT as in SERO TL+, because 2−1=0.52^{-1}=0.52−1=0.5. Equivalently, estimated expression is approximately twofold higher in SERO TL+ than in HAT.
+4. `log2FoldChange = 2` means that estimated expression is approximately 4-fold higher in HAT than in SERO ($2^2 = 4$-fold).
+
+:::
+
+::: {.callout-warning title="Fold change is relative"}
+
+A log2 fold change describes gene expression in **one group relative to another group**. It does not tell us the absolute expression of the gene.
+
+For the HAT versus SERO TL+ comparison:
+
+- a positive value means estimated expression is higher in HAT
+- a negative value means estimated expression is higher in SERO TL+
+- a value of zero means there is no estimated difference between the groups
+
+For example, `log2FoldChange = -1` means that estimated expression in HAT is approximately half that in SERO TL+:
+
+$$
+2^{-1} = 0.5
+$$
+
+The interpretation always depends on the order of the comparison.
+
+:::
+
+
+## Inspecting the result
+
+```{r}
+class(res_hat_vs_sero)
+colnames(res_hat_vs_sero)
+head(res_hat_vs_sero)
+```
+
+::: {.callout-note title="What each column means"}
+- `baseMean`: the average normalised count for a gene across all samples
+- `log2FoldChange`: the estimated effect size and direction for the contrast
+- `lfcSE`: the standard error of the fold-change estimate
+- `stat`: the test statistic used to calculate the p-value
+- `pvalue`: the unadjusted significance value from the statistical test
+- `padj`: the p-value adjusted for multiple testing, because we have tested thousands of genes at once
+
+In this session, we will focus mainly on `log2FoldChange` and `padj`. The log2 fold change describes the estimated size and direction of the difference, while `padj` describes the statistical evidence after accounting for the large number of genes tested. Neither value alone establishes biological importance.
+
+:::
+
+::: {.callout-warning title="Interpreting padj = NA"}
+Some genes have `padj = NA` because DESeq2 did not report an adjusted result for them. This commonly occurs when a gene contains too little useful information, such as very low counts.
+
+An `NA` does not mean that the gene is significantly or non-significantly different. It means that an adjusted result is unavailable.
+:::
+
+::: {.callout-tip title="Try it yourself"}
+Use `summary(res_hat_vs_sero)` to see how many genes had a `padj` below 0.05. Why might this number differ from simply counting genes with a raw `pvalue` below 0.05?
+:::
+
+## Creating and saving an unannotated result table
+
+`results()` returns gene identifiers as row names rather than as an ordinary column, which makes them easy to lose if the table is reordered or resaved so we will convert the result into a data frame while copying the Ensembl identifiers into a new gene_id column.
+
+```{r}
+result_data <- data.frame(
+  gene_id = rownames(res_hat_vs_sero),
+  as.data.frame(res_hat_vs_sero),
+  row.names = NULL
+)
+
+head(result_data)
+```
+
+Now we sort the table so that genes with the smallest non-missing adjusted p-values appear first:
+
+```{r}
+result_data <- result_data[
+  order(result_data$padj, na.last = TRUE),
+]
+
+head(result_data, 10)
+```
+
+```{r}
+write.csv(
+  x = result_data,
+  file = ("tables/DE_hat_vs_sero_unannotated.csv"),
+  row.names = FALSE
+)
+```
+
+**Explore the results**
+
+The results file contains one row for each gene tested, but it does not yet contain gene symbols. Instead, genes are represented by Ensembl identifiers. In [Chapter 6](chapter06.qmd), we will match these identifiers to an annotation table, check for unsuccessful matches, and add readable gene labels for visualisation. For now, we can use an Ensembl identifier to investigate one result and practise turning statistical output into a biological interpretation.
+
+::: {.callout-tip title="Try it yourself: Investigate a differentially expressed gene"}
+
+Open or search the exported results file using a text editor or Excel and find the row containing the following Ensembl gene identifier:
+
+`ENSG00000140968`
+
+Use the information in the results file and an appropriate gene database to answer the following questions:
+
+1. What is the gene symbol associated with this Ensembl identifier?
+2. What is the main biological function of this gene?
+3. What is its `log2FoldChange`?
+4. Is its estimated expression higher in HAT or SERO TL+?
+5. Convert the log2 fold change into an ordinary fold change using: `2^VALUE`
+6. What does the adjusted p-value indicate about the statistical evidence for a difference between the groups?
+7. Based on the function of this gene, suggest why its expression might differ between HAT and SERO TL+ samples.
+8. What additional information or evidence would you need before making a strong biological conclusion?
+
+Write a two- or three-sentence interpretation of the result (you could add it as a comment in your script to remind yourself).
+
+:::
+
+::: {.callout-tip collapse="true" title="Possible Solution"}
+
+1. The Ensembl identifier `ENSG00000140968` corresponds to Interferon regulatory factor 8 (IRF8), also known as interferon consensus sequence-binding protein.
+
+2. IRF8 is a transcription factor that plays critical roles in the regulation of lineage commitment in immune cells.
+
+3. IRF8 has a `log2FoldChange` of approximately `1.58`.
+
+4. Because this value is positive for the **HAT versus SERO TL+** comparison, its estimated expression is higher in HAT.
+
+5. Converting the log2 fold change into an ordinary fold change gives:
+
+```{r}
+2^1.58
+```
+
+Estimated IRF8 expression is therefore approximately **three times as high in HAT as in SERO TL+**.
+
+6. The adjusted p-value is approximately 2.578E-26 (or $2.578 \times 10^{-26}$ in scientific notation). This provides very strong statistical evidence that *IRF8* expression differs between the groups.
+
+7. IRF8 is a transcription factor involved in immune-cell development and responses to infection. Its higher expression in the HAT samples could therefore be associated with differences in immune activity between the groups.
+
+8. The result is an *association* and does not show what caused the difference. It could reflect a change in gene expression within particular cells, differences in the proportions of immune-cell types or other biological or technical differences between the groups.
+
+:::
+
+## Saving the fitted object
+
+Fitting the model is the most time-consuming step in this analysis, so it is worth saving `dds_fitted` once it has been created. Chapter 6 will load this object to begin its exploratory analysis.
+
+```{r}
+saveRDS(dds_fitted,"objects/dds_fitted.rds")
+```
+
+::: {.callout-note title="Why save the fitted object?"}
+`saveRDS()` stores an exact copy of an R object in a file. `readRDS()` can later reload that object, which means `dds_fitted` can be reused in another script or session without rerunning `DESeq()`. This is especially useful for larger data sets, where model fitting can take much longer.
+
+:::
+
+## Summary
+
+In this chapter, you:
+
+- confirmed that `count_data` and `sample_info` are aligned before modelling
+- represented the biological grouping variable as a factor and inspected its levels
+- explained the roles of `countData`, `colData` and `design`
+- constructed a `DESeqDataSet` and inspected its counts, sample information and design
+- filtered out genes with very low total counts, using staged intermediate objects
+- fitted the DESeq2 negative binomial model to the filtered data (`dds_fitted`)
+- extracted a directional contrast between HAT and SERO
+- interpreted the main columns of a DESeq2 results table, including cautious handling of `padj = NA`
+- kept the Ensembl IDs in their own column before saving an unannotated results table
+- saved the fitted model object for reuse in Chapter 6
+
+In the next chapter, we'll retrieve `dds_fitted`, explore the HAT-versus-SERO TL+ result using MA and volcano plots, and connect Ensembl identifiers to readable gene symbols. In Chapter 7, we will move from gene-level results to sample-level patterns using PCA and sample distances.
+
+## Optional extra activities
+
+You have now completed the required activities for this chapter. The remaining section is an **optional, but valuable** challenge for further practice. You can attempt it now or return to it later.
+
+::: {.callout-tip title="Optional Activity 1: Investigate low-count filtering"}
+
+In the main workflow, we used the following code to remove genes with fewer than 10 counts in total across all samples:
+
+```r
+gene_total <- rowSums(counts(dds))
+keep_gene <- gene_total >= 10
+dds_filtered <- dds[keep_gene, ]
+```
+
+We can investigate how this filter works in more detail and check that it produced the expected result.
+
+Your code should:
+
+1. calculate the total count for each gene across all samples;
+2. confirm that there is one value in `gene_total` for every gene in `dds`;
+3. identify which genes have at least 10 counts in total;
+4. count how many genes pass and fail the filter;
+5. use the logical vector to retain the selected gene rows;
+6. confirm that filtering changes the number of genes but not the number of samples;
+7. confirm that the counts belonging to retained genes were not changed.
+
+Use your results to answer the following questions:
+
+1. What does each value in `gene_total` represent?
+2. What does each value in `keep_gene` represent?
+3. What is the difference between `length(keep_gene)` and `sum(keep_gene)`?
+4. How many genes were removed by the filter?
+5. Why did the number of rows change while the number of columns remained the same?
+6. Does passing the filter mean that a gene is differentially expressed?
+7. Does failing the filter mean that a gene has no biological importance?
+
+### Further challenge
+
+Investigate what happens when the threshold is changed to 1, 20, 50 or 100.
+
+- How does increasing the threshold affect the number of retained genes?
+- Is the threshold that removes the most genes automatically the best threshold?
+- Why should a filtering threshold be selected independently of the desired statistical result?
+
+If you want to investigate the computational effect, use `system.time()` to compare how long `DESeq()` takes with the original and filtered objects.
+
+:::
+
+::: {.callout-tip title="Possible solution" collapse="true"}
+
+First, calculate the total count for each gene across all samples:
+
+```{r}
+gene_total <- rowSums(
+  counts(dds)
+)
+```
+
+`gene_total` contains one value per gene. Each value is the sum of that gene's counts across all 21 samples.
+
+Inspect the first few values:
+
+```{r}
+head(gene_total)
+```
+
+Confirm that there is one total for each gene:
+
+```{r}
+length(gene_total)
+nrow(dds)
+```
+
+These values should be identical:
+
+```{r}
+identical(
+  length(gene_total),
+  nrow(dds)
+)
+```
+
+This should return `TRUE`.
+
+Next, test each gene against the threshold:
+
+```{r}
+keep_gene <- gene_total >= 10
+```
+
+Each value in `keep_gene` is:
+
+- `TRUE` if the gene has at least 10 counts in total;
+- `FALSE` if the gene has fewer than 10 counts in total.
+
+Inspect the first few totals and decisions together:
+
+```{r}
+head(
+  data.frame(
+    gene_total = gene_total,
+    keep_gene = keep_gene
+  )
+)
+```
+
+Count how many genes pass and fail the filter:
+
+```{r}
+table(keep_gene)
+```
+
+We can also count the retained genes using:
+
+```{r}
+sum(keep_gene)
+```
+
+`length(keep_gene)` returns the total number of genes tested:
+
+```{r}
+length(keep_gene)
+```
+
+`sum(keep_gene)` returns only the number of genes that pass because R treats `TRUE` as 1 and `FALSE` as 0:
+
+```{r}
+sum(keep_gene)
+```
+
+The number of genes that fail can be calculated using either:
+
+```{r}
+length(keep_gene) - sum(keep_gene)
+```
+
+or:
+
+```{r}
+sum(!keep_gene)
+```
+
+Use the logical vector to retain the selected gene rows:
+
+```{r}
+dds_filtered <- dds[keep_gene, ]
+```
+
+This follows the familiar indexing pattern:
+
+```text
+object[rows, columns]
+```
+
+`keep_gene` appears before the comma, so it selects gene rows. Nothing appears after the comma, so all sample columns are retained.
+
+Compare the dimensions before and after filtering:
+
+```{r}
+dim(dds)
+dim(dds_filtered)
+```
+
+Before filtering, `dds` contains:
+
+```text
+65,217 genes × 21 samples
+```
+
+After filtering, `dds_filtered` contains:
+
+```text
+30,076 genes × 21 samples
+```
+
+Calculate the number of removed genes:
+
+```{r}
+nrow(dds) - nrow(dds_filtered)
+```
+
+This should return `35141`.
+
+Confirm that the number retained agrees with the logical vector:
+
+```{r}
+identical(
+  nrow(dds_filtered),
+  sum(keep_gene)
+)
+```
+
+Confirm that the number removed also agrees:
+
+```{r}
+identical(
+  nrow(dds) - nrow(dds_filtered),
+  sum(!keep_gene)
+)
+```
+
+Both checks should return `TRUE`.
+
+The number of samples should remain unchanged:
+
+```{r}
+identical(
+  ncol(dds),
+  ncol(dds_filtered)
+)
+```
+
+This should also return `TRUE`.
+
+To confirm that filtering did not alter the counts belonging to retained genes, select the same genes and samples from both objects:
+
+```{r}
+retained_gene_names <- rownames(dds_filtered)[1:5]
+
+original_subset <- counts(dds)[
+  retained_gene_names,
+  1:4
+]
+
+filtered_subset <- counts(dds_filtered)[
+  retained_gene_names,
+  1:4
+]
+```
+
+Compare the two subsets:
+
+```{r}
+identical(
+  original_subset,
+  filtered_subset
+)
+```
+
+This should return `TRUE`. Filtering removes complete gene rows but does not transform or normalise the retained counts.
+
+Passing the filter does not mean that a gene is differentially expressed. Failing the filter does not mean that a gene has no biological importance. The filter only identifies genes with very little count information in this dataset.
+
+### Further challenge: Compare thresholds
+
+Create a vector containing several possible thresholds:
+
+```{r}
+thresholds <- c(0, 1, 10, 20, 50, 100)
+```
+
+Calculate how many genes would be retained at each threshold:
+
+```{r}
+genes_retained <- sapply(
+  thresholds,
+  function(threshold) {
+    sum(gene_total >= threshold)
+  }
+)
+```
+
+Combine the results into a data frame:
+
+```{r}
+threshold_summary <- data.frame(
+  threshold = thresholds,
+  genes_retained = genes_retained
+)
+```
+
+Calculate the number removed at each threshold:
+
+```{r}
+threshold_summary$genes_removed <-
+  nrow(dds) - threshold_summary$genes_retained
+```
+
+Inspect the result:
+
+```{r}
+threshold_summary
+```
+
+Increasing the threshold should retain fewer genes. However, a more stringent threshold is not automatically better because it may discard genes containing potentially useful information.
+
+The threshold should be chosen for a defensible analytical reason. It should not be selected by repeatedly trying different values and retaining whichever threshold produces the largest number of significant genes.
+
+### Further challenge: Compare model-fitting times
+
+Fit the unfiltered object and record the elapsed time:
+
+```{r}
+unfiltered_time <- system.time({
+  dds_fitted_unfiltered <- DESeq(dds)
+})
+```
+
+Fit the filtered object:
+
+```{r}
+filtered_time <- system.time({
+  dds_fitted_filtered <- DESeq(dds_filtered)
+})
+```
+
+Create a summary:
+
+```{r}
+runtime_summary <- data.frame(
+  analysis = c(
+    "Unfiltered",
+    "Filtered"
+  ),
+  genes = c(
+    nrow(dds),
+    nrow(dds_filtered)
+  ),
+  elapsed_seconds = c(
+    unfiltered_time[["elapsed"]],
+    filtered_time[["elapsed"]]
+  )
+)
+```
+
+Inspect the result:
+
+```{r}
+runtime_summary
+```
+
+The filtered analysis will often be faster because DESeq2 has fewer gene rows to process. For a dataset of this size, however, the difference may be relatively small.
+
+Runtime varies between computers and between runs. A single timing comparison should therefore be treated as an approximate demonstration rather than a precise benchmark.
+
+:::
+
+::: {.callout-tip title="Optional Activity 3: Compare HAT with CTRL"}
+
+So far, we have compared gene expression between HAT and SERO TL+ samples. We can use the same fitted model to investigate a different biological question:
+
+> Which genes show different expression between HAT and CTRL samples?
+
+Create a new contrast that compares **HAT with CTRL**.
+
+Your code should:
+
+1. use `results()` to extract the HAT-versus-CTRL contrast;
+2. convert the result into a data frame;
+3. retain the Ensembl identifiers in a `gene_id` column;
+4. sort the table by adjusted p-value, with the smallest non-missing values first;
+5. export the table as:
+
+   ```text
+   tables/DE_hat_vs_ctrl_unannotated.csv
+   ```
+
+Remember that the order of the contrast determines the direction of the log2 fold change:
+
+```r
+contrast = c("variable", "numerator", "denominator")
+```
+
+What is the gene at the top of your list? What might finding the same top-ranked gene in both comparisons suggest about its expression in HAT, SERO TL+ and CTRL samples? What further analysis would you need before concluding that SERO TL+ samples are generally more similar to CTRL than to HAT?
+
+:::
+
+::: {.callout-tip title="Possible solution" collapse="true"}
+
+First, extract the HAT-versus-CTRL contrast:
+
+```{r}
+res_hat_vs_ctrl <- results(
+  dds_fitted,
+  contrast = c("status", "hat", "ctrl"),
+  alpha = 0.05
+)
+```
+
+For this contrast:
+
+- a positive `log2FoldChange` indicates higher estimated expression in HAT;
+- a negative `log2FoldChange` indicates higher estimated expression in CTRL.
+
+Convert the result into a data frame and retain the Ensembl gene identifiers:
+
+```{r}
+result_hat_vs_ctrl <- data.frame(
+  gene_id = rownames(res_hat_vs_ctrl),
+  as.data.frame(res_hat_vs_ctrl),
+  row.names = NULL
+)
+```
+
+Sort the table so that genes with the smallest non-missing adjusted p-values appear first:
+
+```{r}
+result_hat_vs_ctrl <- result_hat_vs_ctrl[
+  order(result_hat_vs_ctrl$padj, na.last = TRUE),
+]
+```
+
+Inspect the first few rows:
+
+```{r}
+head(result_hat_vs_ctrl, 10)
+```
+
+Finally, export the sorted table:
+
+```{r}
+write.csv(
+  result_hat_vs_ctrl,
+  file.path(
+    "results",
+    "tables",
+    "DE_hat_vs_ctrl_unannotated.csv"
+  ),
+  row.names = FALSE
+)
+```
+
+Check that the file was created:
+
+```{r}
+file.exists(
+  file.path(
+    "results",
+    "tables",
+    "DE_hat_vs_ctrl_unannotated.csv"
+  )
+)
+```
+
+This should return `TRUE`.
+
+:::
+
+<script>
+  tippy('[data-tippy-content]');
+</script>
+
